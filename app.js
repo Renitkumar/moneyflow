@@ -106,60 +106,94 @@ function updateLiquidLens(){
   const nr=nav.getBoundingClientRect(), ar=active.getBoundingClientRect();
   lens.style.width=`${ar.width}px`;
   lens.style.height=`${ar.height}px`;
-  lens.style.transform=`translate3d(${ar.left-nr.left}px,${ar.top-nr.top}px,0) scale(1)`;
+  lens.style.borderRadius="22px";
+  lens.style.transform=`translate3d(${ar.left-nr.left}px,${ar.top-nr.top}px,0) scaleX(1) scaleY(1)`;
 }
 
 function setupLiquidNavigation(){
   const nav=document.getElementById("bottomNav"), lens=document.getElementById("liquidLens");
   if(!nav || !lens)return;
   const pages=["home","history","add","download"];
-  let dragging=false,moved=false,startX=0,startY=0,startIndex=0,pointerId=null;
+  let dragging=false,moved=false,startX=0,startY=0,startIndex=0,pointerId=null,tapHandled=false;
   const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
   const buttons=()=>pages.map(p=>nav.querySelector(`[data-page="${p}"]`)).filter(Boolean);
-  function paintLens(x,scale=1){
+
+  function paintLens(x,sx=1,sy=1){
     const bs=buttons(); if(!bs.length)return;
     const nr=nav.getBoundingClientRect(),base=bs[startIndex]; if(!base)return;
-    const ar=base.getBoundingClientRect(), maxX=Math.max(8,nr.width-ar.width-8), target=clamp(x,8,maxX);
-    lens.style.width=`${ar.width}px`; lens.style.height=`${ar.height}px`;
-    lens.style.transform=`translate3d(${target}px,${ar.top-nr.top}px,0) scale(${scale})`;
+    const ar=base.getBoundingClientRect();
+    const width=ar.width, expanded=width*sx;
+    const maxX=Math.max(8,nr.width-expanded-8);
+    const target=clamp(x-(expanded-width)/2,8,maxX);
+    lens.style.width=`${width}px`; lens.style.height=`${ar.height}px`;
+    lens.style.transform=`translate3d(${target}px,${ar.top-nr.top-(ar.height*(sy-1)/2)}px,0) scaleX(${sx}) scaleY(${sy})`;
+    lens.style.borderRadius=`${Math.max(18,22/sx)}px`;
     lens.style.transition="none";
   }
+
   function nearestIndexFromLens(){
     const bs=buttons(),nr=nav.getBoundingClientRect();
-    const m=lens.style.transform.match(/translate3d\(([-\d.]+)px/), sm=lens.style.transform.match(/scale\(([-\d.]+)\)/);
-    const left=m?parseFloat(m[1]):0, scale=sm?parseFloat(sm[1]):1, center=left+(lens.offsetWidth*scale)/2;
+    const m=lens.style.transform.match(/translate3d\(([-\d.]+)px/);
+    const mx=lens.style.transform.match(/scaleX\(([-\d.]+)\)/);
+    const sx=mx?parseFloat(mx[1]):1;
+    const left=m?parseFloat(m[1]):0;
+    const center=left+(lens.offsetWidth*sx)/2;
     let best=0,dist=Infinity;
     bs.forEach((b,i)=>{const r=b.getBoundingClientRect(),c=r.left-nr.left+r.width/2,d=Math.abs(c-center);if(d<dist){dist=d;best=i;}});
     return best;
   }
+
   function snapTo(index){currentPage=pages[clamp(index,0,pages.length-1)];renderPage();}
-  nav.querySelectorAll("[data-page]").forEach(b=>b.addEventListener("click",()=>{if(moved)return;const i=pages.indexOf(b.dataset.page);if(i>=0)snapTo(i);}));
+
+  nav.querySelectorAll("[data-page]").forEach(b=>b.addEventListener("click",e=>{
+    if(tapHandled){tapHandled=false;return;}
+    if(moved){e.preventDefault();return;}
+    const i=pages.indexOf(b.dataset.page); if(i>=0)snapTo(i);
+  }));
+
   nav.addEventListener("pointerdown",e=>{
     if(e.pointerType==="mouse"&&e.button!==0)return;
-    const i=Math.max(0,pages.indexOf(currentPage)),active=nav.querySelector(`[data-page="${pages[i]}"]`);if(!active)return;
+    const target=e.target.closest?.("[data-page]");
+    const i=target?pages.indexOf(target.dataset.page):pages.indexOf(currentPage);
+    if(i<0)return;
+    const active=nav.querySelector(`[data-page="${pages[i]}"]`); if(!active)return;
     const nr=nav.getBoundingClientRect(),ar=active.getBoundingClientRect();
-    dragging=true;moved=false;pointerId=e.pointerId;startX=e.clientX;startY=e.clientY;startIndex=i;nav.classList.add("swiping","dragging");
-    try{nav.setPointerCapture(e.pointerId)}catch(_){ } paintLens(ar.left-nr.left,1);
+    dragging=true;moved=false;pointerId=e.pointerId;startX=e.clientX;startY=e.clientY;startIndex=i;
+    nav.classList.add("swiping","dragging");
+    try{nav.setPointerCapture(e.pointerId)}catch(_){ }
+    paintLens(ar.left-nr.left,1,1);
   });
+
   nav.addEventListener("pointermove",e=>{
     if(!dragging||e.pointerId!==pointerId)return;
     const dx=e.clientX-startX,dy=e.clientY-startY;
-    if(Math.abs(dx)>6)moved=true;
+    if(Math.abs(dx)>8)moved=true;
     if(!moved&&Math.abs(dx)<Math.abs(dy)*0.65)return;
     e.preventDefault();
     const nr=nav.getBoundingClientRect(),active=nav.querySelector(`[data-page="${pages[startIndex]}"]`);if(!active)return;
     const ar=active.getBoundingClientRect();
-    const stretch=1+Math.min(0.28,Math.abs(dx)/Math.max(160,nr.width)*0.28);
-    paintLens((ar.left-nr.left)+dx,stretch);
+    const amount=Math.abs(dx)/Math.max(140,nr.width);
+    const sx=1+Math.min(.70,amount*.85);
+    const sy=1+Math.min(.08,amount*.12);
+    paintLens((ar.left-nr.left)+dx,sx,sy);
   },{passive:false});
+
   function endDrag(e){
     if(!dragging||e.pointerId!==pointerId)return;
+    const wasMoved=moved;
+    const target=e.target.closest?.("[data-page]");
+    const targetIndex=target?pages.indexOf(target.dataset.page):-1;
     dragging=false;nav.classList.remove("swiping","dragging");
-    if(moved){e.preventDefault();snapTo(nearestIndexFromLens());}else updateLiquidLens();
+    if(wasMoved){e.preventDefault();snapTo(nearestIndexFromLens());}
+    else if(targetIndex>=0){tapHandled=true;snapTo(targetIndex);setTimeout(()=>tapHandled=false,80);}
+    else updateLiquidLens();
     moved=false;pointerId=null;
   }
-  nav.addEventListener("pointerup",endDrag);nav.addEventListener("pointercancel",endDrag);nav.addEventListener("lostpointercapture",e=>{if(dragging)endDrag(e)});
-  window.addEventListener("resize",updateLiquidLens);updateLiquidLens();
+  nav.addEventListener("pointerup",endDrag);
+  nav.addEventListener("pointercancel",endDrag);
+  nav.addEventListener("lostpointercapture",e=>{if(dragging)endDrag(e)});
+  window.addEventListener("resize",updateLiquidLens);
+  updateLiquidLens();
 }
 
 
