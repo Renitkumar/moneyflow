@@ -20,3 +20,9 @@ Upload the files to your GitHub repository and Vercel will redeploy automaticall
 Do not replace `firestore.rules` with public/test rules.
 
 - Bottom navigation center item is now a large glass/3D `+` Add button.
+
+## Latest navigation and motion
+- Bottom navigation: Home, History, Add (+), Download, Log out.
+- History has All / Positive / Negative filters.
+- Add screen contains only Credit/Debit entry controls; transaction list is not shown there.
+- Added visible 3D motion, glowing glass cards, animated background orbs, floating balance cards, and animated center + button.

@@ -66,9 +66,9 @@ function shell(){
     </header>
     <main class="content"><section id="page"></section></main>
     <nav class="bottom-nav glass">
-      <button data-page="positive"><i>↗</i><span>Positive</span></button>
-      <button data-page="negative"><i>↘</i><span>Negative</span></button>
-      <button data-page="history" class="add-nav"><i>＋</i><span>Add</span></button>
+      <button data-page="home"><i>⌂</i><span>Home</span></button>
+      <button data-page="history"><i>◷</i><span>History</span></button>
+      <button data-page="add" class="add-nav"><i>＋</i><span>Add</span></button>
       <button data-page="download"><i>↓</i><span>Download</span></button>
       <button id="logout"><i>↪</i><span>Log out</span></button>
     </nav>
@@ -82,9 +82,8 @@ function renderPage(){
   const p=document.getElementById("page"); if(!p)return;
   document.querySelectorAll("[data-page]").forEach(b=>b.classList.toggle("active",b.dataset.page===currentPage));
   if(currentPage==="home")renderHome(p);
-  if(currentPage==="positive")renderPositive(p);
-  if(currentPage==="negative")renderNegative(p);
   if(currentPage==="history")renderHistory(p);
+  if(currentPage==="add")renderAdd(p);
   if(currentPage==="download")renderDownload(p);
 }
 
@@ -117,25 +116,28 @@ function renderHome(p){
   <div class="quote">✦<br><b>Discipline today,<br>financial freedom tomorrow.</b></div>`;
 }
 
-function renderPositive(p){
-  const rows=transactions.filter(t=>t.type==="credit"), total=rows.reduce((a,t)=>a+Number(t.amount),0);
-  p.innerHTML=`<div class="page-head"><div><div class="eyebrow">POSITIVE</div><h2>Money received</h2></div><button class="primary" id="addC">＋ Credit</button></div>
-  <div class="summary-strip positive-text"><span>Total positive</span><b>${money(total)}</b></div>${list(rows)}`;
-  document.getElementById("addC").onclick=()=>openTx("credit");
-}
-
-function renderNegative(p){
-  const rows=transactions.filter(t=>t.type==="debit"), total=rows.reduce((a,t)=>a+Number(t.amount),0);
-  p.innerHTML=`<div class="page-head"><div><div class="eyebrow">NEGATIVE</div><h2>Money spent</h2></div><button class="primary" id="addD">＋ Debit</button></div>
-  <div class="summary-strip negative-text"><span>Total negative</span><b>${money(total)}</b></div>${list(rows)}`;
-  document.getElementById("addD").onclick=()=>openTx("debit");
-}
-
 function renderHistory(p){
-  p.innerHTML=`<div class="page-head">
-    <div><div class="eyebrow">ADD TRANSACTION</div><h2>Add Credit / Debit</h2>
-    <p class="muted">Choose one and record your money movement.</p></div>
-  </div>
+  p.innerHTML=`<div class="page-head compact-head"><div class="mini-brand"><span>₹</span><div><b>MoneyFlow</b><small>Transaction history</small></div></div></div>
+  <section class="history-filter glass">
+    <div class="filter-title"><div><div class="eyebrow">HISTORY</div><h2>Your records</h2></div><span class="record-count">${transactions.length} records</span></div>
+    <div class="filter-tabs">
+      <button class="filter-tab active" data-filter="all">All</button>
+      <button class="filter-tab positive-filter" data-filter="credit">↗ Positive</button>
+      <button class="filter-tab negative-filter" data-filter="debit">↘ Negative</button>
+    </div>
+  </section>
+  <div id="historyList">${list(transactions)}</div>`;
+
+  document.querySelectorAll(".filter-tab").forEach(b=>b.onclick=()=>{
+    document.querySelectorAll(".filter-tab").forEach(x=>x.classList.remove("active"));
+    b.classList.add("active");
+    const type=b.dataset.filter;
+    document.getElementById("historyList").innerHTML=list(type==="all"?transactions:transactions.filter(t=>t.type===type));
+  });
+}
+
+function renderAdd(p){
+  p.innerHTML=`<div class="page-head compact-head"><div class="mini-brand"><span>₹</span><div><b>MoneyFlow</b><small>Add transaction</small></div></div></div>
   <section class="history-card glass add-card">
     <div class="type-tabs">
       <button class="type-tab active" data-type="credit">↗ CREDIT<small>Money received</small></button>
@@ -151,9 +153,7 @@ function renderHistory(p){
       <button class="primary wide save-btn" type="submit">Save transaction</button>
     </form>
   </section>
-  <div class="add-hint glass">
-    <span>✦</span><div><b>Real-time sync</b><small>Your saved transaction instantly updates your Positive, Negative and Balance totals.</small></div>
-  </div>`;
+  <div class="add-hint glass"><span>✦</span><div><b>Real-time sync</b><small>Your saved transaction instantly updates Positive, Negative and Current Balance.</small></div></div>`;
 
   document.querySelectorAll(".type-tab").forEach(b=>b.onclick=()=>{
     document.querySelectorAll(".type-tab").forEach(x=>x.classList.remove("active"));
@@ -166,12 +166,9 @@ function renderHistory(p){
     const type=document.getElementById("txType").value;
     try{
       await addDoc(collection(db,"users",currentUser.uid,"transactions"),{
-        type,
-        amount:Number(document.getElementById("txAmount").value),
+        type, amount:Number(document.getElementById("txAmount").value),
         note:document.getElementById("txNote").value.trim(),
-        date:document.getElementById("txDate").value,
-        uid:currentUser.uid,
-        createdAt:serverTimestamp()
+        date:document.getElementById("txDate").value, uid:currentUser.uid, createdAt:serverTimestamp()
       });
       e.target.reset();
       document.getElementById("txDate").value=iso(new Date());
@@ -181,7 +178,7 @@ function renderHistory(p){
 }
 
 function openTx(type){
-  currentPage="history"; renderPage();
+  currentPage="add"; renderPage();
   setTimeout(()=>{
     document.getElementById("txType").value=type;
     document.querySelectorAll(".type-tab").forEach(x=>x.classList.toggle("active",x.dataset.type===type));
