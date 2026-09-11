@@ -2,6 +2,8 @@
 
 This version keeps the Firebase real-time backend and redesigns the frontend.
 
+V7 fixes admin authorization to use the server-side `ADMIN_UID` allowlist directly, and creates a user profile document on registration so temporary locks can be enforced reliably.
+
 ## Changes
 - Light grey blurred animated background
 - Glassmorphism / frosted-glass bottom navigation
@@ -32,7 +34,7 @@ Do not replace `firestore.rules` with public/test rules.
 - Added an animated liquid-glass lens that slides between Home, History, Add and Download on taps or left/right swipes.
 
 
-## Admin panel (V6)
+## Admin panel (V7)
 
 The admin panel is protected server-side with Firebase Admin SDK. It is not secured by a front-end-only password.
 

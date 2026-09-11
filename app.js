@@ -45,6 +45,7 @@ function authView(mode="login"){
         const name=document.getElementById("name").value.trim();
         const c=await createUserWithEmailAndPassword(auth,email,password);
         await updateProfile(c.user,{displayName:name});
+        await setDoc(doc(db,"users",c.user.uid),{displayName:name,lockedUntil:null},{merge:true});
         toast("Account created","success");
       }else await signInWithEmailAndPassword(auth,email,password);
     }catch(err){toast(err.message.replace("Firebase: ",""),"error")}

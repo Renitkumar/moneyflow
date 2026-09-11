@@ -5,15 +5,20 @@ service cloud.firestore {
       allow read: if request.auth != null
                   && request.auth.uid == userId
                   && (!resource.data.lockedUntil || resource.data.lockedUntil < request.time);
-      allow create, update: if request.auth != null
-                            && request.auth.uid == userId
-                            && (!resource.data.lockedUntil || resource.data.lockedUntil < request.time);
+      allow create: if request.auth != null
+                    && request.auth.uid == userId
+                    && (!request.resource.data.lockedUntil || request.resource.data.lockedUntil < request.time);
+      allow update: if request.auth != null
+                    && request.auth.uid == userId
+                    && request.resource.data.lockedUntil == resource.data.lockedUntil
+                    && (!resource.data.lockedUntil || resource.data.lockedUntil < request.time);
       allow delete: if false;
 
       match /transactions/{transactionId} {
         allow read, create: if request.auth != null
                             && request.auth.uid == userId
-                            && (!get(/databases/$(database)/documents/users/$(userId)).data.lockedUntil
+                            && (!exists(/databases/$(database)/documents/users/$(userId))
+                                || !get(/databases/$(database)/documents/users/$(userId)).data.lockedUntil
                                 || get(/databases/$(database)/documents/users/$(userId)).data.lockedUntil < request.time);
         allow update, delete: if false;
       }
