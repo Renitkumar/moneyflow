@@ -59,3 +59,7 @@ The Firebase service-account values must NEVER be put in `firebase-config.js`, G
 - The admin account itself cannot be modified by these controls.
 
 The temporary lock is enforced by Firestore rules as well as shown in the admin UI.
+
+
+## Admin self-delete passcode
+In Vercel Environment Variables, add `ADMIN_SELF_DELETE_PASSCODE` with your chosen passcode (for this setup: `8889`). Keep it server-side. When the admin tries to delete their own transaction, the app asks for this passcode; other users' transactions can still be deleted directly by the admin.

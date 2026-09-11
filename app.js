@@ -240,8 +240,18 @@ async function openAdminUser(u){
       </div>`).join(""):`<div class="admin-loading">No transactions.</div>`;
     document.querySelectorAll(".delete-tx").forEach(b=>b.onclick=async()=>{
       if(!confirm("Remove this transaction? The user's totals will update."))return;
-      try{await adminApi("deleteTransaction",{uid:u.uid,transactionId:b.dataset.id});toast("Transaction removed","success");openAdminUser(u)}
-      catch(e){toast(e.message,"error")}
+      let passcode;
+      if(u.uid===currentUser?.uid){
+        passcode=window.prompt("Admin self-delete requires passcode:");
+        if(passcode===null)return;
+      }
+      try{
+        const payload={uid:u.uid,transactionId:b.dataset.id};
+        if(passcode!==undefined)payload.passcode=passcode;
+        await adminApi("deleteTransaction",payload);
+        toast("Transaction removed","success");
+        openAdminUser(u);
+      }catch(e){toast(e.message,"error")}
     });
   }catch(e){document.getElementById("adminTx").innerHTML=`<div class="admin-error">${esc(e.message)}</div>`}
 }
