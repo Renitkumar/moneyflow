@@ -113,90 +113,53 @@ function setupLiquidNavigation(){
   const nav=document.getElementById("bottomNav"), lens=document.getElementById("liquidLens");
   if(!nav || !lens)return;
   const pages=["home","history","add","download"];
-  let dragging=false, moved=false, startX=0, startY=0, startIndex=0, pointerId=null;
-
+  let dragging=false,moved=false,startX=0,startY=0,startIndex=0,pointerId=null;
   const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
   const buttons=()=>pages.map(p=>nav.querySelector(`[data-page="${p}"]`)).filter(Boolean);
-
-  function paintLens(x, scale=1, animate=false){
-    const bs=buttons();
-    if(!bs.length)return;
-    const nr=nav.getBoundingClientRect();
-    const base=bs[startIndex];
-    if(!base)return;
-    const ar=base.getBoundingClientRect();
-    const maxX=nr.width-ar.width-8;
-    const target=clamp(x,8,maxX);
-    lens.style.width=`${ar.width}px`;
-    lens.style.height=`${ar.height}px`;
+  function paintLens(x,scale=1){
+    const bs=buttons(); if(!bs.length)return;
+    const nr=nav.getBoundingClientRect(),base=bs[startIndex]; if(!base)return;
+    const ar=base.getBoundingClientRect(), maxX=Math.max(8,nr.width-ar.width-8), target=clamp(x,8,maxX);
+    lens.style.width=`${ar.width}px`; lens.style.height=`${ar.height}px`;
     lens.style.transform=`translate3d(${target}px,${ar.top-nr.top}px,0) scale(${scale})`;
-    lens.style.transition=animate?"transform .55s cubic-bezier(.16,1,.3,1),width .24s ease,height .24s ease":"none";
+    lens.style.transition="none";
   }
-
   function nearestIndexFromLens(){
-    const bs=buttons();
-    const nr=nav.getBoundingClientRect();
-    const currentLeft=parseFloat((lens.style.transform.match(/translate3d\(([-\d.]+)px/)||[])[1]||"0"));
-    const lensCenter=currentLeft + lens.getBoundingClientRect().width/2;
-    let best=0,bestDist=Infinity;
-    bs.forEach((b,i)=>{const r=b.getBoundingClientRect();const c=r.left-nr.left+r.width/2;const d=Math.abs(c-lensCenter);if(d<bestDist){bestDist=d;best=i;}});
+    const bs=buttons(),nr=nav.getBoundingClientRect();
+    const m=lens.style.transform.match(/translate3d\(([-\d.]+)px/), sm=lens.style.transform.match(/scale\(([-\d.]+)\)/);
+    const left=m?parseFloat(m[1]):0, scale=sm?parseFloat(sm[1]):1, center=left+(lens.offsetWidth*scale)/2;
+    let best=0,dist=Infinity;
+    bs.forEach((b,i)=>{const r=b.getBoundingClientRect(),c=r.left-nr.left+r.width/2,d=Math.abs(c-center);if(d<dist){dist=d;best=i;}});
     return best;
   }
-
-  function snapTo(index){
-    index=clamp(index,0,pages.length-1);
-    currentPage=pages[index];
-    renderPage();
-  }
-
-  nav.querySelectorAll("[data-page]").forEach(b=>b.addEventListener("click",()=>{
-    if(moved)return;
-    const i=pages.indexOf(b.dataset.page);
-    if(i>=0)snapTo(i);
-  }));
-
+  function snapTo(index){currentPage=pages[clamp(index,0,pages.length-1)];renderPage();}
+  nav.querySelectorAll("[data-page]").forEach(b=>b.addEventListener("click",()=>{if(moved)return;const i=pages.indexOf(b.dataset.page);if(i>=0)snapTo(i);}));
   nav.addEventListener("pointerdown",e=>{
-    if(e.pointerType==="mouse" && e.button!==0)return;
-    const currentIndex=Math.max(0,pages.indexOf(currentPage));
-    const active=nav.querySelector(`[data-page="${pages[currentIndex]}"]`);
-    if(!active)return;
-    const nr=nav.getBoundingClientRect(), ar=active.getBoundingClientRect();
-    dragging=true;moved=false;pointerId=e.pointerId;startX=e.clientX;startY=e.clientY;startIndex=currentIndex;
-    nav.classList.add("swiping","dragging");
-    try{nav.setPointerCapture(e.pointerId)}catch(_){ }
-    paintLens(ar.left-nr.left,1,false);
+    if(e.pointerType==="mouse"&&e.button!==0)return;
+    const i=Math.max(0,pages.indexOf(currentPage)),active=nav.querySelector(`[data-page="${pages[i]}"]`);if(!active)return;
+    const nr=nav.getBoundingClientRect(),ar=active.getBoundingClientRect();
+    dragging=true;moved=false;pointerId=e.pointerId;startX=e.clientX;startY=e.clientY;startIndex=i;nav.classList.add("swiping","dragging");
+    try{nav.setPointerCapture(e.pointerId)}catch(_){ } paintLens(ar.left-nr.left,1);
   });
-
   nav.addEventListener("pointermove",e=>{
-    if(!dragging || e.pointerId!==pointerId)return;
-    const dx=e.clientX-startX, dy=e.clientY-startY;
+    if(!dragging||e.pointerId!==pointerId)return;
+    const dx=e.clientX-startX,dy=e.clientY-startY;
     if(Math.abs(dx)>6)moved=true;
-    if(Math.abs(dx)<Math.abs(dy)*0.65 && !moved)return;
+    if(!moved&&Math.abs(dx)<Math.abs(dy)*0.65)return;
     e.preventDefault();
-    const nr=nav.getBoundingClientRect();
-    const active=nav.querySelector(`[data-page="${pages[startIndex]}"]`);
-    if(!active)return;
+    const nr=nav.getBoundingClientRect(),active=nav.querySelector(`[data-page="${pages[startIndex]}"]`);if(!active)return;
     const ar=active.getBoundingClientRect();
-    const stretch=1 + Math.min(0.18,Math.abs(dx)/Math.max(180,nr.width)*0.18);
-    paintLens((ar.left-nr.left)+dx,stretch,false);
+    const stretch=1+Math.min(0.28,Math.abs(dx)/Math.max(160,nr.width)*0.28);
+    paintLens((ar.left-nr.left)+dx,stretch);
   },{passive:false});
-
   function endDrag(e){
-    if(!dragging || e.pointerId!==pointerId)return;
-    dragging=false;
-    nav.classList.remove("swiping","dragging");
-    if(moved){
-      e.preventDefault();
-      const next=nearestIndexFromLens();
-      snapTo(next);
-    }else updateLiquidLens();
+    if(!dragging||e.pointerId!==pointerId)return;
+    dragging=false;nav.classList.remove("swiping","dragging");
+    if(moved){e.preventDefault();snapTo(nearestIndexFromLens());}else updateLiquidLens();
     moved=false;pointerId=null;
   }
-  nav.addEventListener("pointerup",endDrag);
-  nav.addEventListener("pointercancel",endDrag);
-  nav.addEventListener("lostpointercapture",e=>{if(dragging)endDrag(e)});
-  window.addEventListener("resize",updateLiquidLens);
-  updateLiquidLens();
+  nav.addEventListener("pointerup",endDrag);nav.addEventListener("pointercancel",endDrag);nav.addEventListener("lostpointercapture",e=>{if(dragging)endDrag(e)});
+  window.addEventListener("resize",updateLiquidLens);updateLiquidLens();
 }
 
 
