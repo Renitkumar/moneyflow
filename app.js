@@ -1,253 +1,219 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
-import {
-  getAuth, onAuthStateChanged, signInWithEmailAndPassword,
-  createUserWithEmailAndPassword, signOut, updateProfile
-} from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
-import {
-  getFirestore, collection, addDoc, query, orderBy, onSnapshot,
-  serverTimestamp
-} from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updateProfile } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
+import { getFirestore, collection, addDoc, query, orderBy, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
 import { firebaseConfig } from "./firebase-config.js";
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
-
 const root = document.getElementById("app");
-let currentUser = null;
-let transactions = [];
-let unsubscribe = null;
-let currentPage = "home";
+let currentUser = null, transactions = [], unsubscribe = null, currentPage = "home";
 
-const money = n => `₹${Number(n || 0).toLocaleString("en-IN", {minimumFractionDigits:2, maximumFractionDigits:2})}`;
-const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
-const formatDate = d => new Date(d).toLocaleDateString("en-IN", {day:"2-digit",month:"short",year:"numeric"});
-const localISO = d => {
-  const x = new Date(d);
-  const off = x.getTimezoneOffset();
-  return new Date(x.getTime() - off*60000).toISOString().slice(0,10);
-};
+const money = n => `₹${Number(n || 0).toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+const esc = s => String(s ?? "").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
+const iso = d => { const x=new Date(d), o=x.getTimezoneOffset(); return new Date(x.getTime()-o*60000).toISOString().slice(0,10); };
+const dateText = d => new Date(d+"T12:00:00").toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"});
 
-function toast(msg, type="info") {
-  const el = document.createElement("div");
-  el.className = `toast ${type}`;
-  el.textContent = msg;
-  document.body.appendChild(el);
-  setTimeout(() => el.remove(), 2800);
+function toast(msg,type="info"){
+  const e=document.createElement("div"); e.className=`toast ${type}`; e.textContent=msg;
+  document.body.appendChild(e); setTimeout(()=>e.remove(),2800);
 }
 
-function authView(mode="login") {
-  const register = mode === "register";
-  root.innerHTML = `
-    <main class="auth-shell">
-      <section class="auth-card">
-        <div class="brand-mark">₹</div>
-        <h1>MoneyFlow</h1>
-        <p class="muted">${register ? "Create your account" : "Track your money in real time"}</p>
-        <form id="authForm">
-          ${register ? `<input id="name" type="text" placeholder="Full name" required>` : ""}
-          <input id="email" type="email" placeholder="Email address" required>
-          <input id="password" type="password" placeholder="Password" minlength="6" required>
-          <button class="primary wide" type="submit">${register ? "Create account" : "Login"}</button>
-        </form>
-        <button class="link-btn" id="switchAuth">${register ? "Already have an account? Login" : "New here? Create an account"}</button>
-        <p class="tiny">Your transactions are stored per account in Firebase.</p>
-      </section>
-    </main>`;
-  document.getElementById("switchAuth").onclick = () => authView(register ? "login" : "register");
-  document.getElementById("authForm").onsubmit = async e => {
+function authView(mode="login"){
+  const register=mode==="register";
+  root.innerHTML=`<main class="auth-shell">
+    <div class="orb orb1"></div><div class="orb orb2"></div>
+    <section class="auth-card glass">
+      <div class="brand-mark">₹</div>
+      <h1>MoneyFlow</h1><p>Track Today, Build Tomorrow</p>
+      <form id="authForm">
+        ${register?'<input id="name" placeholder="Full name" required>':""}
+        <input id="email" type="email" placeholder="Email address" required>
+        <input id="password" type="password" placeholder="Password" minlength="6" required>
+        <button class="primary wide">${register?"Create account":"Login"}</button>
+      </form>
+      <button class="link-btn" id="switch">${register?"Already have an account? Login":"New here? Create an account"}</button>
+      <small>Your financial data is stored securely per account.</small>
+    </section>
+  </main>`;
+  document.getElementById("switch").onclick=()=>authView(register?"login":"register");
+  document.getElementById("authForm").onsubmit=async e=>{
     e.preventDefault();
-    const email = document.getElementById("email").value.trim();
-    const password = document.getElementById("password").value;
-    try {
-      if (register) {
-        const name = document.getElementById("name").value.trim();
-        const cred = await createUserWithEmailAndPassword(auth, email, password);
-        await updateProfile(cred.user, {displayName: name});
-        toast("Account created!", "success");
-      } else {
-        await signInWithEmailAndPassword(auth, email, password);
-      }
-    } catch (err) {
-      toast(err.message.replace("Firebase: ", ""), "error");
-    }
+    try{
+      const email=document.getElementById("email").value.trim(), password=document.getElementById("password").value;
+      if(register){
+        const name=document.getElementById("name").value.trim();
+        const c=await createUserWithEmailAndPassword(auth,email,password);
+        await updateProfile(c.user,{displayName:name});
+        toast("Account created","success");
+      }else await signInWithEmailAndPassword(auth,email,password);
+    }catch(err){toast(err.message.replace("Firebase: ",""),"error")}
   };
 }
 
-function shell() {
-  const positive = transactions.filter(t=>t.type==="credit").reduce((a,t)=>a+Number(t.amount),0);
-  const negative = transactions.filter(t=>t.type==="debit").reduce((a,t)=>a+Number(t.amount),0);
-  root.innerHTML = `
-    <div class="app-shell">
-      <header class="topbar">
-        <div>
-          <div class="logo">₹ MoneyFlow</div>
-          <div class="tiny">Live account tracker</div>
-        </div>
-        <div class="user-chip">${esc(currentUser?.displayName || currentUser?.email || "User")}</div>
-      </header>
-      <main class="content">
-        <section id="page"></section>
-      </main>
-      <nav class="bottom-nav">
-        <button data-page="home" class="${currentPage==="home"?"active":""}"><span>⌂</span>Positive</button>
-        <button data-page="negative" class="${currentPage==="negative"?"active":""}"><span>−</span>Negative</button>
-        <button data-page="history" class="${currentPage==="history"?"active":""}"><span>↕</span>History</button>
-        <button data-page="download" class="${currentPage==="download"?"active":""}"><span>↓</span>Download</button>
-        <button id="logout"><span>↪</span>Log out</button>
-      </nav>
-    </div>`;
-  document.querySelectorAll("[data-page]").forEach(b => b.onclick = () => { currentPage=b.dataset.page; renderPage(); });
-  document.getElementById("logout").onclick = async () => {
-    if (unsubscribe) unsubscribe();
-    await signOut(auth);
+function totals(){
+  return {
+    credit:transactions.filter(t=>t.type==="credit").reduce((a,t)=>a+Number(t.amount),0),
+    debit:transactions.filter(t=>t.type==="debit").reduce((a,t)=>a+Number(t.amount),0)
   };
+}
+
+function shell(){
+  root.innerHTML=`<div class="app-shell">
+    <header class="topbar glass">
+      <div class="brand"><span>₹</span><div><b>MoneyFlow</b><small>Track Today, Build Tomorrow</small></div></div>
+      <div class="user-chip">${esc(currentUser?.displayName||currentUser?.email||"User")}</div>
+    </header>
+    <main class="content"><section id="page"></section></main>
+    <nav class="bottom-nav glass">
+      <button data-page="positive"><i>↗</i><span>Positive</span></button>
+      <button data-page="negative"><i>↘</i><span>Negative</span></button>
+      <button data-page="history"><i>↕</i><span>History</span></button>
+      <button data-page="download"><i>↓</i><span>Download</span></button>
+      <button id="logout"><i>↪</i><span>Log out</span></button>
+    </nav>
+  </div>`;
+  document.querySelectorAll("[data-page]").forEach(b=>b.onclick=()=>{currentPage=b.dataset.page;renderPage()});
+  document.getElementById("logout").onclick=()=>signOut(auth);
   renderPage();
 }
 
-function renderPage() {
-  const page = document.getElementById("page");
-  if (!page) return;
-  if (currentPage==="home") renderHome(page);
-  if (currentPage==="negative") renderNegative(page);
-  if (currentPage==="history") renderHistory(page);
-  if (currentPage==="download") renderDownload(page);
-  document.querySelectorAll(".bottom-nav button[data-page]").forEach(b => b.classList.toggle("active", b.dataset.page===currentPage));
+function renderPage(){
+  const p=document.getElementById("page"); if(!p)return;
+  document.querySelectorAll("[data-page]").forEach(b=>b.classList.toggle("active",b.dataset.page===currentPage));
+  if(currentPage==="home")renderHome(p);
+  if(currentPage==="positive")renderPositive(p);
+  if(currentPage==="negative")renderNegative(p);
+  if(currentPage==="history")renderHistory(p);
+  if(currentPage==="download")renderDownload(p);
 }
 
-function renderHome(page) {
-  const credit = transactions.filter(t=>t.type==="credit").reduce((a,t)=>a+Number(t.amount),0);
-  const debit = transactions.filter(t=>t.type==="debit").reduce((a,t)=>a+Number(t.amount),0);
-  page.innerHTML = `
-    <div class="page-head"><div><p class="eyebrow">OVERVIEW</p><h2>Money dashboard</h2></div><span class="live-dot">● Live</span></div>
-    <section class="balance-grid">
-      <article class="balance-card positive-card"><div class="card-label">POSITIVE / CREDIT</div><div class="amount">${money(credit)}</div><div class="sub">Total money received</div></article>
-      <article class="balance-card negative-card"><div class="card-label">NEGATIVE / DEBIT</div><div class="amount">${money(debit)}</div><div class="sub">Total money spent</div></article>
-    </section>
-    <article class="net-card">
-      <div><div class="card-label">CURRENT BALANCE</div><div class="net">${money(credit-debit)}</div></div>
-      <div class="net-symbol">${credit-debit>=0 ? "↑" : "↓"}</div>
-    </article>
-    <div class="quick-grid">
-      <button class="quick" id="addCredit"><b>＋ Credit</b><span>Add money received</span></button>
-      <button class="quick" id="addDebit"><b>＋ Debit</b><span>Add money spent</span></button>
+function renderHome(p){
+  const {credit,debit}=totals(), balance=credit-debit;
+  p.innerHTML=`<section class="hero">
+    <div><div class="eyebrow">OVERVIEW</div>
+      <h1>Good ${new Date().getHours()<12?"Morning":new Date().getHours()<18?"Afternoon":"Evening"}<br>
+      <strong>${esc(currentUser?.displayName?.split(" ")[0]||"there")}</strong> 👋</h1>
+      <p>Small steps. Big results.</p>
     </div>
-    <section class="recent"><div class="section-title"><h3>Recent transactions</h3><button class="text-btn" id="seeHistory">View all</button></div>
-      ${transactionList(transactions.slice(0,5))}
-    </section>`;
-  document.getElementById("addCredit").onclick=()=>openTransaction("credit");
-  document.getElementById("addDebit").onclick=()=>openTransaction("debit");
-  document.getElementById("seeHistory").onclick=()=>{currentPage="history";renderPage();};
+    <div class="floating-cube">₹<span>✦</span></div>
+  </section>
+  <section class="dashboard-grid">
+    <article class="stat-card positive">
+      <div class="stat-icon">↗</div><div class="label">POSITIVE</div>
+      <strong>${money(credit)}</strong><small>Total credits</small>
+    </article>
+    <article class="stat-card negative">
+      <div class="stat-icon">↘</div><div class="label">NEGATIVE</div>
+      <strong>${money(debit)}</strong><small>Total debits</small>
+    </article>
+  </section>
+  <article class="balance-card ${balance<0?"down":""}">
+    <div class="balance-icon">▣</div><div>
+      <div class="label">CURRENT BALANCE</div><strong>${money(balance)}</strong>
+      <small>${balance>=0?"You're on track":"Watch your spending"}</small>
+    </div><div class="balance-arrow">${balance>=0?"↑":"↓"}</div>
+  </article>
+  <div class="quote">✦<br><b>Discipline today,<br>financial freedom tomorrow.</b></div>`;
 }
 
-function renderNegative(page) {
-  const debits = transactions.filter(t=>t.type==="debit");
-  page.innerHTML = `<div class="page-head"><div><p class="eyebrow">NEGATIVE</p><h2>Money spent</h2></div><button class="primary" id="addDebit2">＋ Add debit</button></div>
-    <div class="summary-strip"><span>Total debit</span><b>${money(debits.reduce((a,t)=>a+Number(t.amount),0))}</b></div>
-    ${transactionList(debits)}`;
-  document.getElementById("addDebit2").onclick=()=>openTransaction("debit");
+function renderPositive(p){
+  const rows=transactions.filter(t=>t.type==="credit"), total=rows.reduce((a,t)=>a+Number(t.amount),0);
+  p.innerHTML=`<div class="page-head"><div><div class="eyebrow">POSITIVE</div><h2>Money received</h2></div><button class="primary" id="addC">＋ Credit</button></div>
+  <div class="summary-strip positive-text"><span>Total positive</span><b>${money(total)}</b></div>${list(rows)}`;
+  document.getElementById("addC").onclick=()=>openTx("credit");
 }
 
-function renderHistory(page) {
-  page.innerHTML = `
-    <div class="page-head"><div><p class="eyebrow">HISTORY</p><h2>Credit & Debit</h2></div></div>
-    <section class="history-form">
-      <div class="type-tabs"><button class="type-tab active" data-type="credit">CREDIT<br><small>Money received</small></button><button class="type-tab" data-type="debit">DEBIT<br><small>Money spent</small></button></div>
-      <form id="txForm">
-        <input type="hidden" id="txType" value="credit">
-        <label>Amount (₹)<input id="txAmount" type="number" min="0.01" step="0.01" placeholder="e.g. 1500" required></label>
-        <label>What is it for?<input id="txNote" type="text" maxlength="120" placeholder="Salary, food, travel..." required></label>
-        <label>Date<input id="txDate" type="date" value="${localISO(new Date())}" required></label>
-        <button class="primary wide" type="submit">Save transaction</button>
-      </form>
-    </section>
-    <div class="section-title"><h3>All transactions</h3><span class="tiny">${transactions.length} records</span></div>
-    ${transactionList(transactions)}`;
-  document.querySelectorAll(".type-tab").forEach(btn=>btn.onclick=()=>{
+function renderNegative(p){
+  const rows=transactions.filter(t=>t.type==="debit"), total=rows.reduce((a,t)=>a+Number(t.amount),0);
+  p.innerHTML=`<div class="page-head"><div><div class="eyebrow">NEGATIVE</div><h2>Money spent</h2></div><button class="primary" id="addD">＋ Debit</button></div>
+  <div class="summary-strip negative-text"><span>Total negative</span><b>${money(total)}</b></div>${list(rows)}`;
+  document.getElementById("addD").onclick=()=>openTx("debit");
+}
+
+function renderHistory(p){
+  p.innerHTML=`<div class="page-head"><div><div class="eyebrow">HISTORY</div><h2>Credit & Debit</h2><p class="muted">Add and review every transaction here.</p></div></div>
+  <section class="history-card glass">
+    <div class="type-tabs">
+      <button class="type-tab active" data-type="credit">↗ CREDIT<small>Money received</small></button>
+      <button class="type-tab" data-type="debit">↘ DEBIT<small>Money spent</small></button>
+    </div>
+    <form id="txForm">
+      <input type="hidden" id="txType" value="credit">
+      <div class="input-grid">
+        <label>Amount (₹)<input id="txAmount" type="number" min=".01" step=".01" placeholder="1500" required></label>
+        <label>Date<input id="txDate" type="date" value="${iso(new Date())}" required></label>
+      </div>
+      <label>Description<input id="txNote" maxlength="120" placeholder="Salary, food, travel..." required></label>
+      <button class="primary wide">Save transaction</button>
+    </form>
+  </section>
+  <div class="section-title"><h3>All transactions</h3><span>${transactions.length} records</span></div>
+  ${list(transactions)}`;
+  document.querySelectorAll(".type-tab").forEach(b=>b.onclick=()=>{
     document.querySelectorAll(".type-tab").forEach(x=>x.classList.remove("active"));
-    btn.classList.add("active"); document.getElementById("txType").value=btn.dataset.type;
+    b.classList.add("active"); document.getElementById("txType").value=b.dataset.type;
   });
   document.getElementById("txForm").onsubmit=async e=>{
     e.preventDefault();
-    const amount=Number(document.getElementById("txAmount").value);
-    const note=document.getElementById("txNote").value.trim();
-    const date=document.getElementById("txDate").value;
     const type=document.getElementById("txType").value;
-    try {
-      await addDoc(collection(db,"users",currentUser.uid,"transactions"), {
-        type, amount, note, date, createdAt: serverTimestamp(), uid: currentUser.uid
+    try{
+      await addDoc(collection(db,"users",currentUser.uid,"transactions"),{
+        type, amount:Number(document.getElementById("txAmount").value),
+        note:document.getElementById("txNote").value.trim(),
+        date:document.getElementById("txDate").value, uid:currentUser.uid, createdAt:serverTimestamp()
       });
-      e.target.reset(); document.getElementById("txDate").value=localISO(new Date()); 
-      toast(`${type==="credit"?"Credit":"Debit"} added`, "success");
-    } catch(err) { toast(err.message, "error"); }
+      e.target.reset(); document.getElementById("txDate").value=iso(new Date());
+      toast(type==="credit"?"Credit added":"Debit added","success");
+    }catch(err){toast(err.message,"error")}
   };
 }
 
-function openTransaction(type) {
+function openTx(type){
   currentPage="history"; renderPage();
   setTimeout(()=>{
     document.getElementById("txType").value=type;
     document.querySelectorAll(".type-tab").forEach(x=>x.classList.toggle("active",x.dataset.type===type));
     document.getElementById("txAmount")?.focus();
-  }, 0);
+  },0);
 }
 
-function transactionList(list) {
-  if (!list.length) return `<div class="empty"><div>₹</div><h3>No transactions yet</h3><p>Add a credit or debit to start your history.</p></div>`;
-  return `<div class="tx-list">${list.map(t=>`
-    <div class="tx">
-      <div class="tx-icon ${t.type}">${t.type==="credit"?"↑":"↓"}</div>
-      <div class="tx-main"><b>${esc(t.note)}</b><span>${formatDate(t.date)}</span></div>
-      <strong class="${t.type}">${t.type==="credit"?"+":"−"}${money(t.amount)}</strong>
-    </div>`).join("")}</div>`;
+function list(rows){
+  if(!rows.length)return `<div class="empty"><div>₹</div><h3>No transactions yet</h3><p>Add your first credit or debit from History.</p></div>`;
+  return `<div class="tx-list">${rows.map(t=>`<div class="tx">
+    <div class="tx-icon ${t.type}">${t.type==="credit"?"↗":"↘"}</div>
+    <div class="tx-main"><b>${esc(t.note)}</b><span>${dateText(t.date)}</span></div>
+    <strong class="${t.type}">${t.type==="credit"?"+":"−"}${money(t.amount)}</strong>
+  </div>`).join("")}</div>`;
 }
 
-function renderDownload(page) {
-  page.innerHTML = `
-    <div class="page-head"><div><p class="eyebrow">EXPORT</p><h2>Download report</h2></div></div>
-    <section class="download-card">
-      <p class="muted">Select the date range. The downloaded CSV will contain your credit/debit list and totals at the top.</p>
-      <div class="date-grid"><label>From<input id="fromDate" type="date"></label><label>To<input id="toDate" type="date" value="${localISO(new Date())}"></label></div>
-      <button class="primary wide" id="downloadBtn">↓ Download CSV</button>
-    </section>
-    <div class="download-preview" id="preview"></div>`;
-  const from=document.getElementById("fromDate");
-  const to=document.getElementById("toDate");
-  from.value = transactions.length ? localISO(new Date(Math.min(...transactions.map(t=>new Date(t.date).getTime())))) : localISO(new Date());
+function renderDownload(p){
+  p.innerHTML=`<div class="page-head"><div><div class="eyebrow">EXPORT</div><h2>Download report</h2></div></div>
+  <section class="download-card glass"><p class="muted">Choose a date range to download your complete credit/debit report.</p>
+    <div class="input-grid"><label>From<input id="from" type="date"></label><label>To<input id="to" type="date" value="${iso(new Date())}"></label></div>
+    <div id="preview"></div><button class="primary wide" id="download">↓ Download CSV</button>
+  </section>`;
+  const f=document.getElementById("from"),t=document.getElementById("to");
+  f.value=transactions.length?iso(new Date(Math.min(...transactions.map(x=>new Date(x.date).getTime())))):iso(new Date());
   const preview=()=>{
-    const rows=filterRange(from.value,to.value);
-    const c=rows.filter(t=>t.type==="credit").reduce((a,t)=>a+Number(t.amount),0);
-    const d=rows.filter(t=>t.type==="debit").reduce((a,t)=>a+Number(t.amount),0);
-    document.getElementById("preview").innerHTML=`<div class="summary-strip"><span>Positive ${money(c)}</span><span>Negative ${money(d)}</span><b>Balance ${money(c-d)}</b></div><p class="tiny">${rows.length} transactions selected</p>`;
+    const r=range(f.value,t.value),c=r.filter(x=>x.type==="credit").reduce((a,x)=>a+Number(x.amount),0),d=r.filter(x=>x.type==="debit").reduce((a,x)=>a+Number(x.amount),0);
+    document.getElementById("preview").innerHTML=`<div class="report-total"><span>Positive<b>${money(c)}</b></span><span>Negative<b>${money(d)}</b></span><span>Balance<b>${money(c-d)}</b></span></div><small>${r.length} transactions selected</small>`;
   };
-  from.onchange=to.onchange=preview; preview();
-  document.getElementById("downloadBtn").onclick=()=>{
-    const rows=filterRange(from.value,to.value);
-    if(!rows.length) return toast("No transactions in this date range","error");
-    const c=rows.filter(t=>t.type==="credit").reduce((a,t)=>a+Number(t.amount),0);
-    const d=rows.filter(t=>t.type==="debit").reduce((a,t)=>a+Number(t.amount),0);
-    const csv = [
-      ["MONEYFLOW REPORT"],["Positive / Credit",c],["Negative / Debit",d],["Balance",c-d],[],
-      ["Date","Type","Description","Amount (₹)"],
-      ...rows.map(t=>[t.date,t.type==="credit"?"Credit":"Debit",t.note,Number(t.amount).toFixed(2)])
-    ].map(r=>r.map(v=>`"${String(v??"").replace(/"/g,'""')}"`).join(",")).join("\n");
-    const blob=new Blob(["\ufeff"+csv],{type:"text/csv;charset=utf-8"});
-    const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=`moneyflow_${from.value}_to_${to.value}.csv`; a.click(); URL.revokeObjectURL(a.href);
+  f.onchange=t.onchange=preview; preview();
+  document.getElementById("download").onclick=()=>{
+    const r=range(f.value,t.value); if(!r.length)return toast("No transactions in this range","error");
+    const c=r.filter(x=>x.type==="credit").reduce((a,x)=>a+Number(x.amount),0),d=r.filter(x=>x.type==="debit").reduce((a,x)=>a+Number(x.amount),0);
+    const csv=[["MONEYFLOW REPORT"],["Positive / Credit",c],["Negative / Debit",d],["Balance",c-d],[],["Date","Type","Description","Amount (₹)"],...r.map(x=>[x.date,x.type==="credit"?"Credit":"Debit",x.note,Number(x.amount).toFixed(2)])]
+      .map(row=>row.map(v=>`"${String(v??"").replace(/"/g,'""')}"`).join(",")).join("\n");
+    const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob(["\ufeff"+csv],{type:"text/csv;charset=utf-8"})); a.download=`moneyflow_${f.value}_to_${t.value}.csv`; a.click(); URL.revokeObjectURL(a.href);
   };
 }
+function range(f,t){return transactions.filter(x=>x.date>=f&&x.date<=t).sort((a,b)=>b.date.localeCompare(a.date))}
 
-function filterRange(from,to) {
-  return transactions.filter(t=>t.date>=from && t.date<=to).sort((a,b)=>b.date.localeCompare(a.date));
-}
-
-onAuthStateChanged(auth, user => {
+onAuthStateChanged(auth,user=>{
   currentUser=user;
-  if (!user) { if(unsubscribe) unsubscribe(); authView(); return; }
-  currentPage="home";
-  shell();
-  const q=query(collection(db,"users",user.uid,"transactions"), orderBy("date","desc"));
-  unsubscribe=onSnapshot(q, snap=>{
-    transactions=snap.docs.map(d=>({id:d.id,...d.data()}));
-    renderPage();
-  }, err=>toast("Could not sync data: "+err.message,"error"));
+  if(!user){if(unsubscribe)unsubscribe();authView();return}
+  currentPage="home"; shell();
+  const q=query(collection(db,"users",user.uid,"transactions"),orderBy("date","desc"));
+  unsubscribe=onSnapshot(q,s=>{transactions=s.docs.map(d=>({id:d.id,...d.data()}));renderPage()},e=>toast("Sync error: "+e.message,"error"));
 });

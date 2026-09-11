@@ -1,40 +1,20 @@
-# MoneyFlow — Real-time Credit/Debit Tracker
+# MoneyFlow — 3D Glass Redesign
 
-This is a responsive HTML/CSS/JavaScript money tracker designed to deploy on Vercel.
+This version keeps the Firebase real-time backend and redesigns the frontend.
 
-## Features
-- Login + registration with Firebase Authentication
-- Real-time Firestore transaction sync
-- Positive/Credit total
-- Negative/Debit total
-- Current balance = credits - debits
-- History page with separate Credit/Debit selection and inputs
-- Download page with From/To date filters
-- CSV report with Positive, Negative and Balance totals at the top
-- 5 main options: Positive, Negative, History, Download, Log out
-- Responsive mobile/desktop UI
+## Changes
+- Light grey blurred animated background
+- Glassmorphism / frosted-glass bottom navigation
+- Rounded navigation corners
+- 3D floating decorative element
+- More rounded Positive, Negative and Current Balance cards
+- Home page shows only Positive, Negative and Current Balance
+- History contains credit/debit entry form and all transactions
+- Positive and Negative pages remain accessible from the bottom navigation
+- Download page exports date-filtered CSV
+- Firebase Authentication + Firestore real-time sync retained
 
-## Firebase setup
-1. Open Firebase Console.
-2. Create a project.
-3. Enable Authentication > Sign-in method > Email/Password.
-4. Create Firestore Database.
-5. Add a Web App.
-6. Copy its config into `firebase-config.js`.
-7. Apply the rules in `firestore.rules`.
+## Deploy
+Upload the files to your GitHub repository and Vercel will redeploy automatically.
 
-## Vercel
-Upload this folder to GitHub, import the repository into Vercel, and deploy. No build command is needed.
-
-IMPORTANT: HTML/CSS/JS alone cannot provide secure multi-user real-time storage. Firebase is used as the backend/database, while Vercel hosts the frontend.
-
-## Data structure
-users/{uid}/transactions/{transactionId}
-
-Each transaction:
-- type: credit | debit
-- amount: number
-- note: string
-- date: YYYY-MM-DD
-- uid: Firebase Auth UID
-- createdAt: Firestore server timestamp
+Do not replace `firestore.rules` with public/test rules.
