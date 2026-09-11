@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
-import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updateProfile } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updateProfile, getIdToken } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
 import { getFirestore, collection, addDoc, query, orderBy, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
 import { firebaseConfig } from "./firebase-config.js";
 
@@ -62,7 +62,10 @@ function shell(){
   root.innerHTML=`<div class="app-shell">
     <header class="topbar glass">
       <div class="brand"><span>₹</span><div><b>MoneyFlow</b><small>Track Today, Build Tomorrow</small></div></div>
-      <div class="user-chip">${esc(currentUser?.displayName||currentUser?.email||"User")}</div>
+      <div class="header-actions">
+        <button id="adminPanelBtn" class="admin-panel-btn hidden">⚙ Admin Panel</button>
+        <div class="user-chip">${esc(currentUser?.displayName||currentUser?.email||"User")}</div>
+      </div>
     </header>
     <main class="content"><section id="page"></section></main>
     <nav class="bottom-nav liquid-nav glass" id="bottomNav">
@@ -76,7 +79,9 @@ function shell(){
   </div>`;
   document.querySelectorAll("[data-page]").forEach(b=>b.onclick=()=>{currentPage=b.dataset.page;renderPage()});
   document.getElementById("logout").onclick=()=>signOut(auth);
+  document.getElementById("adminPanelBtn").onclick=()=>{ currentPage="admin"; renderPage(); };
   setupLiquidNavigation();
+  checkAdminAccess();
   renderPage();
 }
 
@@ -130,6 +135,116 @@ function setupLiquidNavigation(){
   updateLiquidLens();
 }
 
+
+async function adminApi(action, payload={}){
+  const token=await currentUser.getIdToken();
+  const res=await fetch(`/api/admin?action=${encodeURIComponent(action)}`,{
+    method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${token}`},
+    body:JSON.stringify(payload)
+  });
+  const data=await res.json().catch(()=>({error:"Invalid server response"}));
+  if(!res.ok)throw new Error(data.error||"Admin request failed");
+  return data;
+}
+
+async function checkAdminAccess(){
+  try{
+    const data=await adminApi("me");
+    const btn=document.getElementById("adminPanelBtn");
+    if(btn && data.isAdmin)btn.classList.remove("hidden");
+  }catch(_){}
+}
+
+async function renderAdmin(p){
+  p.innerHTML=`<div class="admin-shell">
+    <div class="admin-head">
+      <div><div class="eyebrow">ADMIN CONTROL</div><h2>Admin Panel</h2><p class="muted">Manage users and correct transactions securely.</p></div>
+      <button class="secondary" id="backHome">← Home</button>
+    </div>
+    <div class="admin-stats" id="adminStats"><div class="admin-stat glass"><b>Loading…</b><small>Users</small></div></div>
+    <section class="admin-card glass">
+      <div class="admin-toolbar"><h3>Users</h3><input id="userSearch" placeholder="Search name or email"></div>
+      <div id="adminUsers" class="admin-users"><div class="admin-loading">Loading users…</div></div>
+    </section>
+  </div>`;
+  document.getElementById("backHome").onclick=()=>{currentPage="home";renderPage()};
+  try{
+    const data=await adminApi("users");
+    document.getElementById("adminStats").innerHTML=`
+      <div class="admin-stat glass"><strong>${data.users.length}</strong><small>Total users</small></div>
+      <div class="admin-stat glass"><strong>${data.users.filter(u=>u.disabled).length}</strong><small>Disabled</small></div>
+      <div class="admin-stat glass"><strong>${data.users.filter(u=>u.locked).length}</strong><small>Temporarily locked</small></div>`;
+    const renderUsers=()=>{
+      const q=document.getElementById("userSearch").value.trim().toLowerCase();
+      const rows=data.users.filter(u=>(u.email+" "+(u.displayName||"")).toLowerCase().includes(q));
+      document.getElementById("adminUsers").innerHTML=rows.length?rows.map(u=>`
+        <article class="admin-user ${u.disabled?"is-disabled":""}">
+          <div class="admin-user-main"><div class="avatar">${esc((u.displayName||u.email||"?").slice(0,1).toUpperCase())}</div>
+            <div><b>${esc(u.displayName||"Unnamed user")}</b><span>${esc(u.email||"No email")}</span><small>${u.uid}</small></div></div>
+          <div class="user-money"><span class="pos">+ ${money(u.credit)}</span><span class="neg">− ${money(u.debit)}</span><strong>${money(u.balance)}</strong><small>${u.locked?"LOCKED":u.disabled?"DISABLED":"ACTIVE"}</small></div>
+          <button class="secondary manage-user" data-uid="${u.uid}">Manage</button>
+        </article>`).join(""):`<div class="admin-loading">No users found.</div>`;
+      document.querySelectorAll(".manage-user").forEach(b=>b.onclick=()=>openAdminUser(data.users.find(u=>u.uid===b.dataset.uid)));
+    };
+    document.getElementById("userSearch").oninput=renderUsers; renderUsers();
+  }catch(err){document.getElementById("adminUsers").innerHTML=`<div class="admin-error">${esc(err.message)}</div>`}
+}
+
+async function openAdminUser(u){
+  const p=document.getElementById("page");
+  p.innerHTML=`<div class="admin-shell">
+    <div class="admin-head"><div><div class="eyebrow">USER MANAGEMENT</div><h2>${esc(u.displayName||"User")}</h2><p class="muted">${esc(u.email||"")}</p></div><button class="secondary" id="backUsers">← Users</button></div>
+    <section class="user-overview glass">
+      <div class="overview-money"><span class="pos">Positive ${money(u.credit)}</span><span class="neg">Negative ${money(u.debit)}</span><strong>${money(u.balance)}</strong><small>Available balance</small></div>
+      <div class="status-pill ${u.disabled?"bad":u.locked?"warn":"ok"}">${u.disabled?"DISABLED":u.locked?"LOCKED":"ACTIVE"}</div>
+    </section>
+    <section class="admin-card glass">
+      <div class="admin-toolbar"><h3>Transactions</h3><span class="muted">Admin can remove incorrect entries</span></div>
+      <div id="adminTx" class="tx-list"><div class="admin-loading">Loading…</div></div>
+    </section>
+    <section class="admin-actions glass">
+      <h3>Account controls</h3>
+      <p class="muted">These actions affect only this user's account.</p>
+      <div class="action-grid">
+        <button class="secondary" id="toggleLock">${u.locked?"Unlock temporarily locked user":"Temporary lock"}</button>
+        <button class="secondary" id="toggleDisable">${u.disabled?"Enable account":"Disable account"}</button>
+        <button class="danger" id="deleteUser">Delete account</button>
+      </div>
+      <small class="admin-warning">Delete permanently removes the Firebase Auth account and the user's transaction records. Use only when necessary.</small>
+    </section>
+  </div>`;
+  document.getElementById("backUsers").onclick=()=>renderAdmin(document.getElementById("page"));
+
+  document.getElementById("toggleLock").onclick=async()=>{
+    try{await adminApi(u.locked?"unlockUser":"lockUser",{uid:u.uid});toast(u.locked?"User unlocked":"User temporarily locked","success");renderAdmin(document.getElementById("page"))}
+    catch(e){toast(e.message,"error")}
+  };
+  document.getElementById("toggleDisable").onclick=async()=>{
+    try{await adminApi(u.disabled?"enableUser":"disableUser",{uid:u.uid});toast(u.disabled?"Account enabled":"Account disabled","success");renderAdmin(document.getElementById("page"))}
+    catch(e){toast(e.message,"error")}
+  };
+  document.getElementById("deleteUser").onclick=async()=>{
+    if(!confirm(`Delete ${u.email||u.displayName||"this user"} permanently?`))return;
+    try{await adminApi("deleteUser",{uid:u.uid});toast("Account deleted","success");renderAdmin(document.getElementById("page"))}
+    catch(e){toast(e.message,"error")}
+  };
+
+  try{
+    const data=await adminApi("transactions",{uid:u.uid});
+    document.getElementById("adminTx").innerHTML=data.transactions.length?data.transactions.map(t=>`
+      <div class="tx admin-tx"><div class="tx-icon ${t.type}">${t.type==="credit"?"↗":"↘"}</div>
+        <div class="tx-main"><b>${esc(t.note)}</b><span>${esc(t.date)} · ${esc(t.id)}</span></div>
+        <strong class="${t.type}">${t.type==="credit"?"+":"−"}${money(t.amount)}</strong>
+        <button class="delete-tx" data-id="${t.id}" title="Delete transaction">✕</button>
+      </div>`).join(""):`<div class="admin-loading">No transactions.</div>`;
+    document.querySelectorAll(".delete-tx").forEach(b=>b.onclick=async()=>{
+      if(!confirm("Remove this transaction? The user's totals will update."))return;
+      try{await adminApi("deleteTransaction",{uid:u.uid,transactionId:b.dataset.id});toast("Transaction removed","success");openAdminUser(u)}
+      catch(e){toast(e.message,"error")}
+    });
+  }catch(e){document.getElementById("adminTx").innerHTML=`<div class="admin-error">${esc(e.message)}</div>`}
+}
+
 function renderPage(){
   const p=document.getElementById("page"); if(!p)return;
   document.querySelectorAll("[data-page]").forEach(b=>b.classList.toggle("active",b.dataset.page===currentPage));
@@ -138,6 +253,7 @@ function renderPage(){
   if(currentPage==="history")renderHistory(p);
   if(currentPage==="add")renderAdd(p);
   if(currentPage==="download")renderDownload(p);
+  if(currentPage==="admin")renderAdmin(p);
 }
 
 function renderHome(p){
