@@ -68,7 +68,7 @@ function shell(){
     <nav class="bottom-nav glass">
       <button data-page="positive"><i>↗</i><span>Positive</span></button>
       <button data-page="negative"><i>↘</i><span>Negative</span></button>
-      <button data-page="history"><i>↕</i><span>History</span></button>
+      <button data-page="history" class="add-nav"><i>＋</i><span>Add</span></button>
       <button data-page="download"><i>↓</i><span>Download</span></button>
       <button id="logout"><i>↪</i><span>Log out</span></button>
     </nav>
@@ -132,8 +132,11 @@ function renderNegative(p){
 }
 
 function renderHistory(p){
-  p.innerHTML=`<div class="page-head"><div><div class="eyebrow">HISTORY</div><h2>Credit & Debit</h2><p class="muted">Add and review every transaction here.</p></div></div>
-  <section class="history-card glass">
+  p.innerHTML=`<div class="page-head">
+    <div><div class="eyebrow">ADD TRANSACTION</div><h2>Add Credit / Debit</h2>
+    <p class="muted">Choose one and record your money movement.</p></div>
+  </div>
+  <section class="history-card glass add-card">
     <div class="type-tabs">
       <button class="type-tab active" data-type="credit">↗ CREDIT<small>Money received</small></button>
       <button class="type-tab" data-type="debit">↘ DEBIT<small>Money spent</small></button>
@@ -145,25 +148,33 @@ function renderHistory(p){
         <label>Date<input id="txDate" type="date" value="${iso(new Date())}" required></label>
       </div>
       <label>Description<input id="txNote" maxlength="120" placeholder="Salary, food, travel..." required></label>
-      <button class="primary wide">Save transaction</button>
+      <button class="primary wide save-btn" type="submit">Save transaction</button>
     </form>
   </section>
-  <div class="section-title"><h3>All transactions</h3><span>${transactions.length} records</span></div>
-  ${list(transactions)}`;
+  <div class="add-hint glass">
+    <span>✦</span><div><b>Real-time sync</b><small>Your saved transaction instantly updates your Positive, Negative and Balance totals.</small></div>
+  </div>`;
+
   document.querySelectorAll(".type-tab").forEach(b=>b.onclick=()=>{
     document.querySelectorAll(".type-tab").forEach(x=>x.classList.remove("active"));
-    b.classList.add("active"); document.getElementById("txType").value=b.dataset.type;
+    b.classList.add("active");
+    document.getElementById("txType").value=b.dataset.type;
   });
+
   document.getElementById("txForm").onsubmit=async e=>{
     e.preventDefault();
     const type=document.getElementById("txType").value;
     try{
       await addDoc(collection(db,"users",currentUser.uid,"transactions"),{
-        type, amount:Number(document.getElementById("txAmount").value),
+        type,
+        amount:Number(document.getElementById("txAmount").value),
         note:document.getElementById("txNote").value.trim(),
-        date:document.getElementById("txDate").value, uid:currentUser.uid, createdAt:serverTimestamp()
+        date:document.getElementById("txDate").value,
+        uid:currentUser.uid,
+        createdAt:serverTimestamp()
       });
-      e.target.reset(); document.getElementById("txDate").value=iso(new Date());
+      e.target.reset();
+      document.getElementById("txDate").value=iso(new Date());
       toast(type==="credit"?"Credit added":"Debit added","success");
     }catch(err){toast(err.message,"error")}
   };
