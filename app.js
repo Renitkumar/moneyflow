@@ -1,6 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updateProfile, getIdToken } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
-import { getFirestore, collection, addDoc, query, orderBy, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
+import { getFirestore, doc, setDoc, collection, addDoc, query, orderBy, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
 import { firebaseConfig } from "./firebase-config.js";
 
 const app = initializeApp(firebaseConfig);
@@ -8,6 +8,18 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const root = document.getElementById("app");
 let currentUser = null, transactions = [], unsubscribe = null, currentPage = "home";
+
+// Pick one fresh underwater hero image when the app loads. The lock value prevents
+// the image service/browser cache from returning the same image on every open.
+const HERO_IMAGES = [
+  "https://loremflickr.com/900/600/underwater,fish?lock=goldfish-" + Math.random(),
+  "https://loremflickr.com/900/600/ocean,fish?lock=reef-" + Math.random(),
+  "https://loremflickr.com/900/600/underwater,jellyfish?lock=jelly-" + Math.random(),
+  "https://loremflickr.com/900/600/tropical,fish?lock=tropical-" + Math.random(),
+  "https://loremflickr.com/900/600/coral,fish?lock=coral-" + Math.random(),
+  "https://loremflickr.com/900/600/sea,fish?lock=sea-" + Math.random()
+];
+const HERO_IMAGE = HERO_IMAGES[Math.floor(Math.random() * HERO_IMAGES.length)];
 
 const money = n => `₹${Number(n || 0).toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2})}`;
 const esc = s => String(s ?? "").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
@@ -275,7 +287,7 @@ function renderHome(p){
       <strong>${esc(currentUser?.displayName?.split(" ")[0]||"there")}</strong> 👋</h1>
       <p>Small steps. Big results.</p>
     </div>
-    <div class="floating-cube">₹<span>✦</span></div>
+    <div class="hero-fish" aria-hidden="true" style="--hero-image:url('${HERO_IMAGE}')"><span>✦</span></div>
   </section>
   <section class="dashboard-grid">
     <article class="stat-card positive">
