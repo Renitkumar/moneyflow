@@ -26,3 +26,5 @@ Do not replace `firestore.rules` with public/test rules.
 - History has All / Positive / Negative filters.
 - Add screen contains only Credit/Debit entry controls; transaction list is not shown there.
 - Added visible 3D motion, glowing glass cards, animated background orbs, floating balance cards, and animated center + button.
+
+- Fixed duplicate MoneyFlow header on secondary pages; the global top bar is now the only branding header.

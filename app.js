@@ -117,7 +117,9 @@ function renderHome(p){
 }
 
 function renderHistory(p){
-  p.innerHTML=`<div class="page-head compact-head"><div class="mini-brand"><span>₹</span><div><b>MoneyFlow</b><small>Transaction history</small></div></div></div>
+  p.innerHTML=`<div class="page-head">
+    <div><div class="eyebrow">HISTORY</div><h2>Your records</h2><p class="muted">See when money came in or went out.</p></div>
+  </div>
   <section class="history-filter glass">
     <div class="filter-title"><div><div class="eyebrow">HISTORY</div><h2>Your records</h2></div><span class="record-count">${transactions.length} records</span></div>
     <div class="filter-tabs">
@@ -137,7 +139,9 @@ function renderHistory(p){
 }
 
 function renderAdd(p){
-  p.innerHTML=`<div class="page-head compact-head"><div class="mini-brand"><span>₹</span><div><b>MoneyFlow</b><small>Add transaction</small></div></div></div>
+  p.innerHTML=`<div class="page-head">
+    <div><div class="eyebrow">ADD TRANSACTION</div><h2>Credit / Debit</h2><p class="muted">Record your money movement.</p></div>
+  </div>
   <section class="history-card glass add-card">
     <div class="type-tabs">
       <button class="type-tab active" data-type="credit">↗ CREDIT<small>Money received</small></button>
@@ -196,7 +200,9 @@ function list(rows){
 }
 
 function renderDownload(p){
-  p.innerHTML=`<div class="page-head"><div><div class="eyebrow">EXPORT</div><h2>Download report</h2></div></div>
+  p.innerHTML=`<div class="page-head">
+    <div><div class="eyebrow">EXPORT</div><h2>Download report</h2><p class="muted">Choose a date range for your report.</p></div>
+  </div>
   <section class="download-card glass"><p class="muted">Choose a date range to download your complete credit/debit report.</p>
     <div class="input-grid"><label>From<input id="from" type="date"></label><label>To<input id="to" type="date" value="${iso(new Date())}"></label></div>
     <div id="preview"></div><button class="primary wide" id="download">↓ Download CSV</button>

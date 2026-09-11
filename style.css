@@ -103,3 +103,6 @@ form{display:grid;gap:14px}.input-grid{display:grid;grid-template-columns:1fr 1f
 .toast{animation:toastIn .35s cubic-bezier(.2,.9,.2,1) both}
 @keyframes toastIn{from{opacity:0;transform:translateY(18px) scale(.92)}to{opacity:1;transform:none}}
 @media(max-width:620px){.bottom-nav .add-nav{margin-top:-20px}.bottom-nav .add-nav i{width:53px;height:53px}.filter-tabs{grid-template-columns:1fr 1fr 1fr}.filter-tab{font-size:10px;padding:11px 4px}.filter-title h2{font-size:22px}}
+
+/* Remove duplicate in-page branding; the global topbar is the only MoneyFlow header. */
+.mini-brand{display:none}
