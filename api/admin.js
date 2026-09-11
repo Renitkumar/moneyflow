@@ -146,10 +146,7 @@ module.exports = async (req, res) => {
       throw new Error("User UID is required.");
     }
 
-    // Admin account cannot be modified
-    if (uid === process.env.ADMIN_UID) {
-      throw new Error("The admin account cannot be modified.");
-    }
+
 
     // Get transactions
     if (action === "transactions") {
@@ -173,6 +170,21 @@ module.exports = async (req, res) => {
       if (!body.transactionId) {
         throw new Error("Transaction ID is required.");
       }
+      if (uid === process.env.ADMIN_UID) {
+  const expected = String(
+    process.env.ADMIN_SELF_DELETE_PASSCODE || ""
+  );
+
+  if (!expected) {
+    throw new Error(
+      "Admin self-delete passcode is not configured."
+    );
+  }
+
+  if (String(body.passcode || "") !== expected) {
+    throw new Error("Invalid admin self-delete passcode.");
+  }
+}
 
       await db
         .collection("users")
