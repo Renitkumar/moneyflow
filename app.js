@@ -12,13 +12,13 @@ let currentUser = null, transactions = [], unsubscribe = null, currentPage = "ho
 // Pick one fresh underwater hero image when the app loads. The lock value prevents
 // the image service/browser cache from returning the same image on every open.
 const HERO_IMAGES = [
-  "https://loremflickr.com/900/600/underwater,fish?lock=goldfish-" + Math.random(),
-  "https://loremflickr.com/900/600/ocean,fish?lock=reef-" + Math.random(),
-  "https://loremflickr.com/900/600/underwater,jellyfish?lock=jelly-" + Math.random(),
-  "https://loremflickr.com/900/600/tropical,fish?lock=tropical-" + Math.random(),
-  "https://loremflickr.com/900/600/coral,fish?lock=coral-" + Math.random(),
-  "https://loremflickr.com/900/600/sea,fish?lock=sea-" + Math.random()
+  "https://images.unsplash.com/photo-1544551763-46a013bb70d5?auto=format&fit=crop&w=1600&q=82",
+  "https://images.unsplash.com/photo-1546026423-cc4642628d2b?auto=format&fit=crop&w=1600&q=82",
+  "https://images.unsplash.com/photo-1530053969600-caed2596d242?auto=format&fit=crop&w=1600&q=82",
+  "https://images.unsplash.com/photo-1469474968028-56623f02e42e?auto=format&fit=crop&w=1600&q=82",
+  "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1600&q=82"
 ];
+// A different remote wallpaper is selected on every fresh app load.
 const HERO_IMAGE = HERO_IMAGES[Math.floor(Math.random() * HERO_IMAGES.length)];
 
 const money = n => `₹${Number(n || 0).toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2})}`;
@@ -33,22 +33,31 @@ function toast(msg,type="info"){
 
 function authView(mode="login"){
   const register=mode==="register";
-  root.innerHTML=`<main class="auth-shell">
-    <div class="orb orb1"></div><div class="orb orb2"></div>
-    <section class="auth-card glass">
-      <div class="brand-mark">₹</div>
-      <h1>MoneyFlow</h1><p>Track Today, Build Tomorrow</p>
+  const AUTH_BACKGROUNDS = [
+    "https://images.unsplash.com/photo-1500534623283-312aade485b7?auto=format&fit=crop&w=1600&q=82",
+    "https://images.unsplash.com/photo-1470770841072-f978cf4d019e?auto=format&fit=crop&w=1600&q=82",
+    "https://images.unsplash.com/photo-1497250681960-ef046c08a56e?auto=format&fit=crop&w=1600&q=82"
+  ];
+  const bg=AUTH_BACKGROUNDS[Math.floor(Math.random()*AUTH_BACKGROUNDS.length)];
+  root.innerHTML=`<main class="auth-shell video-auth" style="--auth-bg:url('${bg}')">
+    <div class="auth-light light-a"></div><div class="auth-light light-b"></div>
+    <section class="auth-card glass auth-video-card ${register?'is-register':''}">
+      <button class="auth-close" id="authClose" aria-label="Close">×</button>
+      <div class="auth-floating-logo"><span>≋</span></div>
+      <div class="auth-title-wrap"><div class="auth-kicker">MONEY MANAGEMENT</div><h1>${register?'Create account':'Welcome Back'}</h1><p>${register?'Start your journey with MoneyFlow':'Sign in to continue'}</p></div>
       <form id="authForm">
-        ${register?'<input id="name" placeholder="Full name" required>':""}
-        <input id="email" type="email" placeholder="Email address" required>
-        <input id="password" type="password" placeholder="Password" minlength="6" required>
-        <button class="primary wide">${register?"Create account":"Login"}</button>
+        ${register?'<label class="auth-field"><span>Username</span><input id="name" placeholder="Your name" required></label>':""}
+        <label class="auth-field"><span>Email</span><input id="email" type="email" placeholder="Email address" required></label>
+        <label class="auth-field"><span>Password</span><input id="password" type="password" placeholder="Password" minlength="6" required></label>
+        <div class="auth-options"><label><input type="checkbox"> <span>Remember me</span></label>${register?'':'<button type="button" class="forgot-btn">Forgot Password?</button>'}</div>
+        <button class="primary wide auth-login-btn" type="submit"><span>${register?'Create Account':'Login'}</span><b>→</b></button>
       </form>
-      <button class="link-btn" id="switch">${register?"Already have an account? Login":"New here? Create an account"}</button>
-      <small>Your financial data is stored securely per account.</small>
+      <div class="auth-switch">${register?'Already have an account?':'Don’t have an account?'} <button class="link-btn" id="switch">${register?'Login':'Register'}</button></div>
+      <small class="auth-secure">Your financial data is stored securely per account.</small>
     </section>
   </main>`;
   document.getElementById("switch").onclick=()=>authView(register?"login":"register");
+  document.getElementById("authClose").onclick=()=>{ if(currentUser) shell(); };
   document.getElementById("authForm").onsubmit=async e=>{
     e.preventDefault();
     try{
@@ -63,7 +72,6 @@ function authView(mode="login"){
     }catch(err){toast(err.message.replace("Firebase: ",""),"error")}
   };
 }
-
 function totals(){
   return {
     credit:transactions.filter(t=>t.type==="credit").reduce((a,t)=>a+Number(t.amount),0),
@@ -72,7 +80,7 @@ function totals(){
 }
 
 function shell(){
-  root.innerHTML=`<div class="app-shell">
+  root.innerHTML=`<div class="app-shell home-wallpaper" style="--hero-image:url('${HERO_IMAGE}')">
     <header class="topbar">
       <div class="brand"><span class="brand-wave">≋</span><div><b>MoneyFlow</b><small>Track Today, Build Tomorrow</small></div></div>
       <div class="header-actions">
@@ -84,7 +92,6 @@ function shell(){
     <nav class="bottom-nav liquid-nav glass" id="bottomNav">
       <div class="liquid-lens" id="liquidLens" aria-hidden="true"></div>
       <button data-page="home"><i>⌂</i><span>Home</span></button>
-      <button data-page="history"><i>◷</i><span>History</span></button>
       <button data-page="add" class="add-nav"><i>＋</i><span>Add</span></button>
       <button data-page="download"><i>↓</i><span>Download</span></button>
       <button id="logout"><i>↪</i><span>Log out</span></button>
@@ -125,7 +132,7 @@ function setupLiquidNavigation(){
   nav.addEventListener("touchend",e=>{
     const t=e.changedTouches[0], dx=t.clientX-startX, dy=t.clientY-startY, dt=Date.now()-startTime;
     if(Math.abs(dx)>55 && Math.abs(dx)>Math.abs(dy)*1.25 && dt<650){
-      const pages=["home","history","add","download"];
+      const pages=["home","add","download"];
       const i=pages.indexOf(currentPage);
       const next=dx<0?Math.min(i+1,pages.length-1):Math.max(i-1,0);
       if(next!==i){currentPage=pages[next];renderPage();}
@@ -138,7 +145,7 @@ function setupLiquidNavigation(){
     if(!mouseDown)return; mouseDown=false;
     const dx=e.clientX-mouseStart;
     if(Math.abs(dx)>75){
-      const pages=["home","history","add","download"];
+      const pages=["home","add","download"];
       const i=pages.indexOf(currentPage);
       const next=dx<0?Math.min(i+1,pages.length-1):Math.max(i-1,0);
       if(next!==i){currentPage=pages[next];renderPage();}
@@ -270,6 +277,8 @@ async function openAdminUser(u){
 
 function renderPage(){
   const p=document.getElementById("page"); if(!p)return;
+  const tb=document.querySelector(".topbar");
+  if(tb) tb.classList.toggle("home-only-brand", currentPage==="home");
   document.querySelectorAll("[data-page]").forEach(b=>b.classList.toggle("active",b.dataset.page===currentPage));
   requestAnimationFrame(updateLiquidLens);
   if(currentPage==="home")renderHome(p);
@@ -281,33 +290,20 @@ function renderPage(){
 
 function renderHome(p){
   const {credit,debit}=totals(), balance=credit-debit;
-  p.innerHTML=`<section class="hero hero-scene" style="--hero-image:url('${HERO_IMAGE}')">
-    <div class="hero-image-overlay" aria-hidden="true"></div>
-    <div class="hero-copy"><div class="eyebrow">OVERVIEW</div>
-      <h1>Good ${new Date().getHours()<12?"Morning":new Date().getHours()<18?"Afternoon":"Evening"}<br>
-      <strong>${esc(currentUser?.displayName?.split(" ")[0]||"there")}</strong> 👋</h1>
-      <p>Small steps. Big results.</p>
-    </div>
+  const hour=new Date().getHours();
+  const greeting=hour<12?"Good Morning":hour<18?"Good Afternoon":"Good Evening";
+  p.innerHTML=`<section class="home-greeting">
+    <div class="eyebrow">OVERVIEW</div>
+    <h1>${greeting}<br><strong>${esc(currentUser?.displayName?.split(" ")[0]||"there")}</strong> 👋</h1>
+    <p>Small steps. Big results.</p>
   </section>
   <section class="dashboard-grid">
-    <article class="stat-card positive">
-      <div class="stat-icon">↗</div><div class="label">POSITIVE</div>
-      <strong>${money(credit)}</strong><small>Total credits</small>
-    </article>
-    <article class="stat-card negative">
-      <div class="stat-icon">↘</div><div class="label">NEGATIVE</div>
-      <strong>${money(debit)}</strong><small>Total debits</small>
-    </article>
+    <article class="stat-card positive"><div class="stat-icon">↗</div><div class="label">POSITIVE</div><strong>${money(credit)}</strong><small>Total credits</small></article>
+    <article class="stat-card negative"><div class="stat-icon">↘</div><div class="label">NEGATIVE</div><strong>${money(debit)}</strong><small>Total debits</small></article>
   </section>
-  <article class="balance-card ${balance<0?"down":""}">
-    <div class="balance-icon">▣</div><div>
-      <div class="label">CURRENT BALANCE</div><strong>${money(balance)}</strong>
-      <small>${balance>=0?"You're on track":"Watch your spending"}</small>
-    </div><div class="balance-arrow">${balance>=0?"↑":"↓"}</div>
-  </article>
+  <article class="balance-card ${balance<0?"down":""}"><div class="balance-icon">▣</div><div><div class="label">CURRENT BALANCE</div><strong>${money(balance)}</strong><small>${balance>=0?"You're on track":"Watch your spending"}</small></div><div class="balance-arrow">${balance>=0?"↑":"↓"}</div></article>
   <div class="quote">✦<br><b>Discipline today,<br>financial freedom tomorrow.</b></div>`;
 }
-
 function renderHistory(p){
   p.innerHTML=`<div class="page-head">
     <div><div class="eyebrow">HISTORY</div><h2>Your records</h2><p class="muted">See when money came in or went out.</p></div>
