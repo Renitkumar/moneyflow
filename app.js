@@ -73,11 +73,11 @@ function totals(){
 
 function shell(){
   root.innerHTML=`<div class="app-shell">
-    <header class="topbar">
-      <div class="brand"><span class="brand-wave">≋</span><div><b>MoneyFlow</b><small>Track Today, Build Tomorrow</small></div></div>
+    <header class="topbar glass">
+      <div class="brand"><span>₹</span><div><b>MoneyFlow</b><small>Track Today, Build Tomorrow</small></div></div>
       <div class="header-actions">
         <button id="adminPanelBtn" class="admin-panel-btn hidden">⚙ Admin Panel</button>
-        <div class="user-chip"><span class="user-dot">${esc((currentUser?.displayName||currentUser?.email||"U").slice(0,1).toUpperCase())}</span><span class="user-name">${esc(currentUser?.displayName||currentUser?.email||"User")}</span></div>
+        <div class="user-chip">${esc(currentUser?.displayName||currentUser?.email||"User")}</div>
       </div>
     </header>
     <main class="content"><section id="page"></section></main>
@@ -281,13 +281,13 @@ function renderPage(){
 
 function renderHome(p){
   const {credit,debit}=totals(), balance=credit-debit;
-  p.innerHTML=`<section class="hero hero-scene" style="--hero-image:url('${HERO_IMAGE}')">
-    <div class="hero-image-overlay" aria-hidden="true"></div>
-    <div class="hero-copy"><div class="eyebrow">OVERVIEW</div>
+  p.innerHTML=`<section class="hero">
+    <div><div class="eyebrow">OVERVIEW</div>
       <h1>Good ${new Date().getHours()<12?"Morning":new Date().getHours()<18?"Afternoon":"Evening"}<br>
       <strong>${esc(currentUser?.displayName?.split(" ")[0]||"there")}</strong> 👋</h1>
       <p>Small steps. Big results.</p>
     </div>
+    <div class="hero-fish" aria-hidden="true" style="--hero-image:url('${HERO_IMAGE}')"><span>✦</span></div>
   </section>
   <section class="dashboard-grid">
     <article class="stat-card positive">
