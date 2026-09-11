@@ -28,3 +28,5 @@ Do not replace `firestore.rules` with public/test rules.
 - Added visible 3D motion, glowing glass cards, animated background orbs, floating balance cards, and animated center + button.
 
 - Fixed duplicate MoneyFlow header on secondary pages; the global top bar is now the only branding header.
+
+- Added an animated liquid-glass lens that slides between Home, History, Add and Download on taps or left/right swipes.

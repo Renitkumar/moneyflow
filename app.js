@@ -65,7 +65,8 @@ function shell(){
       <div class="user-chip">${esc(currentUser?.displayName||currentUser?.email||"User")}</div>
     </header>
     <main class="content"><section id="page"></section></main>
-    <nav class="bottom-nav glass">
+    <nav class="bottom-nav liquid-nav glass" id="bottomNav">
+      <div class="liquid-lens" id="liquidLens" aria-hidden="true"></div>
       <button data-page="home"><i>⌂</i><span>Home</span></button>
       <button data-page="history"><i>◷</i><span>History</span></button>
       <button data-page="add" class="add-nav"><i>＋</i><span>Add</span></button>
@@ -75,12 +76,64 @@ function shell(){
   </div>`;
   document.querySelectorAll("[data-page]").forEach(b=>b.onclick=()=>{currentPage=b.dataset.page;renderPage()});
   document.getElementById("logout").onclick=()=>signOut(auth);
+  setupLiquidNavigation();
   renderPage();
+}
+
+
+function updateLiquidLens(){
+  const nav=document.getElementById("bottomNav"), lens=document.getElementById("liquidLens");
+  if(!nav || !lens)return;
+  const active=nav.querySelector(`[data-page="${currentPage}"]`);
+  if(!active)return;
+  const nr=nav.getBoundingClientRect(), ar=active.getBoundingClientRect();
+  lens.style.width=`${ar.width}px`;
+  lens.style.height=`${ar.height}px`;
+  lens.style.transform=`translate(${ar.left-nr.left}px, ${ar.top-nr.top}px)`;
+}
+
+function setupLiquidNavigation(){
+  const nav=document.getElementById("bottomNav");
+  if(!nav)return;
+  nav.querySelectorAll("[data-page]").forEach(b=>b.addEventListener("click",()=>{
+    currentPage=b.dataset.page;
+    renderPage();
+  }));
+
+  let startX=0,startY=0,startTime=0;
+  nav.addEventListener("touchstart",e=>{
+    const t=e.changedTouches[0]; startX=t.clientX; startY=t.clientY; startTime=Date.now();
+  },{passive:true});
+  nav.addEventListener("touchend",e=>{
+    const t=e.changedTouches[0], dx=t.clientX-startX, dy=t.clientY-startY, dt=Date.now()-startTime;
+    if(Math.abs(dx)>55 && Math.abs(dx)>Math.abs(dy)*1.25 && dt<650){
+      const pages=["home","history","add","download"];
+      const i=pages.indexOf(currentPage);
+      const next=dx<0?Math.min(i+1,pages.length-1):Math.max(i-1,0);
+      if(next!==i){currentPage=pages[next];renderPage();}
+    }
+  },{passive:true});
+
+  let mouseDown=false,mouseStart=0;
+  nav.addEventListener("pointerdown",e=>{mouseDown=true;mouseStart=e.clientX});
+  nav.addEventListener("pointerup",e=>{
+    if(!mouseDown)return; mouseDown=false;
+    const dx=e.clientX-mouseStart;
+    if(Math.abs(dx)>75){
+      const pages=["home","history","add","download"];
+      const i=pages.indexOf(currentPage);
+      const next=dx<0?Math.min(i+1,pages.length-1):Math.max(i-1,0);
+      if(next!==i){currentPage=pages[next];renderPage();}
+    }
+  });
+  window.addEventListener("resize",updateLiquidLens);
+  updateLiquidLens();
 }
 
 function renderPage(){
   const p=document.getElementById("page"); if(!p)return;
   document.querySelectorAll("[data-page]").forEach(b=>b.classList.toggle("active",b.dataset.page===currentPage));
+  requestAnimationFrame(updateLiquidLens);
   if(currentPage==="home")renderHome(p);
   if(currentPage==="history")renderHistory(p);
   if(currentPage==="add")renderAdd(p);
