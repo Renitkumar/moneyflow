@@ -165,7 +165,7 @@ function shell(){
       <div class="brand"><span>₹</span><div><b>MoneyFlow</b><small>Track Today, Build Tomorrow</small></div></div>
       <div class="header-actions">
         <button id="adminPanelBtn" class="admin-panel-btn hidden">⚙ Admin Panel</button>
-        <button id="profileChip" class="user-chip" type="button">${currentUser?.photoURL?`<img src="${esc(currentUser.photoURL)}" alt="">`:`<span class="user-chip-avatar">${esc((currentUser?.displayName||currentUser?.email||"U").slice(0,1).toUpperCase())}</span>`}<span>${esc(currentUser?.displayName||currentUser?.email||"User")}</span></button>
+        <div class="user-chip">${currentUser?.photoURL?`<img src="${esc(currentUser.photoURL)}" alt="">`:`<span class="user-chip-avatar">${esc((currentUser?.displayName||currentUser?.email||"U").slice(0,1).toUpperCase())}</span>`}<span>${esc(currentUser?.displayName||currentUser?.email||"User")}</span></div>
       </div>
     </header>
     <main class="content"><section id="page"></section></main>
@@ -190,7 +190,6 @@ function shell(){
       toast(err.message.replace("Firebase: ",""),"error");
     }
   };
-  document.getElementById("profileChip").onclick=()=>{ currentPage="profile"; renderPage(); };
   document.getElementById("adminPanelBtn").onclick=()=>{ currentPage="admin"; renderPage(); };
   setupLiquidNavigation();
   checkAdminAccess();
@@ -320,7 +319,7 @@ async function renderAdmin(p){
   p.innerHTML=`<div class="admin-shell">
     <div class="admin-head">
       <div><div class="eyebrow">ADMIN CONTROL</div><h2>Admin Panel</h2><p class="muted">Manage users and correct transactions securely.</p></div>
-      <div class="admin-head-actions"><button class="icon-btn feedback-admin-btn" id="feedbackAdminBtn" title="Feedbacks" aria-label="Feedbacks">💬</button><button class="secondary" id="backHome">← Home</button></div>
+      <div class="admin-head-actions"><button class="secondary" id="backHome">← Home</button></div>
     </div>
     <div class="admin-stats" id="adminStats"><div class="admin-stat glass"><b>Loading…</b><small>Users</small></div></div>
     <section class="admin-card glass">
@@ -328,7 +327,6 @@ async function renderAdmin(p){
       <div id="adminUsers" class="admin-users"><div class="admin-loading">Loading users…</div></div>
     </section>
   </div>`;
-  document.getElementById("feedbackAdminBtn").onclick=()=>{currentPage="feedback";renderPage()};
   document.getElementById("backHome").onclick=()=>{currentPage="home";renderPage()};
   try{
     const data=await adminApi("users");
@@ -561,13 +559,24 @@ function renderProfile(p){
   document.getElementById("profileImageInput").onchange=e=>uploadProfileImage(e.target.files?.[0]);
   document.getElementById("saveProfile").onclick=()=>saveProfileName(document.getElementById("profileName").value);
   document.getElementById("sendFeedback").onclick=async()=>{
+    const btn=document.getElementById("sendFeedback");
     const text=document.getElementById("feedbackText").value.trim();
     if(!text)return toast("Please write some feedback first","error");
+    if(!currentUser?.uid)return toast("Please login again before sending feedback","error");
+    btn.disabled=true;
     try{
-      await addDoc(collection(db,"users",currentUser.uid,"feedback"),{text,uid:currentUser.uid,email:currentUser.email||"",displayName:currentUser.displayName||name,createdAt:serverTimestamp()});
+      await addDoc(collection(db,"users",currentUser.uid,"feedback"),{
+        text,
+        uid:currentUser.uid,
+        email:currentUser.email||"",
+        displayName:currentUser.displayName||name,
+        createdAt:serverTimestamp()
+      });
       document.getElementById("feedbackText").value="";
-      toast("Thanks for your feedback","success");
-    }catch(e){toast(e.message,"error")}
+      toast("Feedback sent successfully","success");
+    }catch(e){
+      toast((e.message||"Unable to send feedback").replace("Firebase: ",""),"error");
+    }finally{btn.disabled=false;}
   };
 }
 

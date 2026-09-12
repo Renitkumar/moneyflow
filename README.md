@@ -1,10 +1,11 @@
-# MoneyFlow V9 — Admin User Reports
+# MoneyFlow Profile + Feedback Fix
 
-V9 base with the existing Firebase/Auth/Firestore/admin functionality plus:
-- Admin can open any user's transactions.
-- A **Download Report** button appears in the user's transaction section.
-- Admin can choose **One date** or **Date range**.
-- Export is day-wise and keeps Positive and Negative transactions in separate columns with their descriptions/source.
-- Each day has a daily total and the report ends with overall Positive, Negative and Net Balance totals.
+This version fixes profile photo/name persistence and feedback sending/admin feedback retrieval.
 
-Vercel server-side admin environment variables remain unchanged.
+Firebase setup required:
+- Enable Cloud Storage for Firebase and create the default bucket.
+- Deploy `storage.rules`.
+- Deploy `firestore.rules`.
+- Deploy the included `api/admin.js` to Vercel.
+
+Cloud Storage currently requires the Firebase project to be on the Blaze pay-as-you-go plan.
