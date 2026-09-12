@@ -19,6 +19,33 @@ function toast(msg,type="info"){
   document.body.appendChild(e); setTimeout(()=>e.remove(),2800);
 }
 
+function confirmLogout(){
+  return new Promise(resolve=>{
+    const old=document.getElementById("logoutConfirmModal");
+    if(old)old.remove();
+    const modal=document.createElement("div");
+    modal.id="logoutConfirmModal";
+    modal.className="logout-confirm-modal";
+    modal.innerHTML=`<div class="logout-confirm-card glass" role="dialog" aria-modal="true" aria-labelledby="logoutConfirmTitle">
+      <div class="logout-confirm-icon">↪</div>
+      <h3 id="logoutConfirmTitle">Are you sure?</h3>
+      <p>Do you want to log out of MoneyFlow?</p>
+      <div class="logout-confirm-actions">
+        <button type="button" class="secondary logout-no">No</button>
+        <button type="button" class="primary logout-yes">Yes, Log out</button>
+      </div>
+    </div>`;
+    document.body.appendChild(modal);
+    const close=value=>{modal.classList.add("closing"); setTimeout(()=>modal.remove(),140); resolve(value);};
+    modal.querySelector(".logout-no").onclick=()=>close(false);
+    modal.querySelector(".logout-yes").onclick=()=>close(true);
+    modal.addEventListener("click",e=>{if(e.target===modal)close(false)});
+    const onKey=e=>{if(e.key==="Escape"){document.removeEventListener("keydown",onKey);close(false)}};
+    document.addEventListener("keydown",onKey);
+    setTimeout(()=>modal.querySelector(".logout-no")?.focus(),0);
+  });
+}
+
 function authView(mode="login"){
   if(mode==="forgot"){
     root.innerHTML=`<main class="auth-shell">
@@ -40,7 +67,11 @@ function authView(mode="login"){
       e.preventDefault();
       try{
         const email=document.getElementById("resetEmail").value.trim();
-        await sendPasswordResetEmail(auth,email);
+        const actionCodeSettings={
+          url:"https://moneyflow-rouge.vercel.app/",
+          handleCodeInApp:false
+        };
+        await sendPasswordResetEmail(auth,email,actionCodeSettings);
         toast("Password reset link sent to your email","success");
         setTimeout(()=>authView("login"),1200);
       }catch(err){
@@ -146,7 +177,17 @@ function shell(){
     </nav>
   </div>`;
   document.querySelectorAll("[data-page]").forEach(b=>b.onclick=()=>{currentPage=b.dataset.page;renderPage()});
-  document.getElementById("logout").onclick=()=>signOut(auth);
+  document.getElementById("logout").onclick=async e=>{
+    e.preventDefault();
+    e.stopPropagation();
+    const confirmed=await confirmLogout();
+    if(!confirmed)return;
+    try{
+      await signOut(auth);
+    }catch(err){
+      toast(err.message.replace("Firebase: ",""),"error");
+    }
+  };
   document.getElementById("adminPanelBtn").onclick=()=>{ currentPage="admin"; renderPage(); };
   setupLiquidNavigation();
   checkAdminAccess();
@@ -210,7 +251,9 @@ function setupLiquidNavigation(){
   nav.addEventListener("pointerdown",e=>{
     if(e.pointerType==="mouse"&&e.button!==0)return;
     const target=e.target.closest?.("[data-page]");
-    const i=target?pages.indexOf(target.dataset.page):pages.indexOf(currentPage);
+    // Do not hijack pointer events for non-navigation controls such as Log out.
+    if(!target)return;
+    const i=pages.indexOf(target.dataset.page);
     if(i<0)return;
     const active=nav.querySelector(`[data-page="${pages[i]}"]`); if(!active)return;
     const nr=nav.getBoundingClientRect(),ar=active.getBoundingClientRect();
