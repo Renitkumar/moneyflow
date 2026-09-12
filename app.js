@@ -73,27 +73,101 @@ function scheduleDailyRefresh(){
 function shell(){
   root.innerHTML=`<div class="app-shell">
     <header class="topbar glass">
-      <div class="brand"><span>₹</span><div><b>MoneyFlow</b><small>Track Today, Build Tomorrow</small></div></div>
+      <div class="brand">
+        <span>₹</span>
+        <div>
+          <b>MoneyFlow</b>
+          <small>Track Today, Build Tomorrow</small>
+        </div>
+      </div>
+
       <div class="header-actions">
         <button id="adminPanelBtn" class="admin-panel-btn hidden">⚙ Admin Panel</button>
-        <div class="user-chip">${esc(currentUser?.displayName||currentUser?.email||"User")}</div>
+        <div class="user-chip">
+          ${esc(currentUser?.displayName||currentUser?.email||"User")}
+        </div>
       </div>
     </header>
-    <main class="content"><section id="page"></section></main>
+
+    <main class="content">
+      <section id="page"></section>
+    </main>
+
     <nav class="bottom-nav liquid-nav glass" id="bottomNav">
       <div class="liquid-lens" id="liquidLens" aria-hidden="true"></div>
-      <button data-page="home"><i>⌂</i><span>Home</span></button>
-      <button data-page="history"><i>◷</i><span>History</span></button>
-      <button data-page="add" class="add-nav"><i>＋</i><span>Add</span></button>
-      <button data-page="download"><i>↓</i><span>Download</span></button>
-      <button id="logout"><i>↪</i><span>Log out</span></button>
+
+      <button data-page="home">
+        <i>⌂</i>
+        <span>Home</span>
+      </button>
+
+      <button data-page="history">
+        <i>◷</i>
+        <span>History</span>
+      </button>
+
+      <button data-page="add" class="add-nav">
+        <i>＋</i>
+        <span>Add</span>
+      </button>
+
+      <button data-page="download">
+        <i>↓</i>
+        <span>Download</span>
+      </button>
+
+      <button id="logout">
+        <i>↪</i>
+        <span>Log out</span>
+      </button>
     </nav>
   </div>`;
-  document.getElementById("logout").onclick=()=>signOut(auth);
-  document.getElementById("adminPanelBtn").onclick=()=>{ currentPage="admin"; renderPage(); };
-  setupLiquidNavigation();
-  checkAdminAccess();
+
+  // Logout
+  document.getElementById("logout").onclick=()=>{
+    signOut(auth);
+  };
+
+  // Admin panel
+  document.getElementById("adminPanelBtn").onclick=()=>{
+    currentPage="admin";
+    renderPage();
+  };
+
+  /*
+    IMPORTANT:
+    Home page MUST render first.
+    Admin check and liquid navigation must never
+    stop the initial Home rendering.
+  */
+
   renderPage();
+
+  // Initialize liquid navigation safely
+  try{
+    setupLiquidNavigation();
+  }catch(err){
+    console.error("Liquid navigation init error:",err);
+  }
+
+  // Check admin after Home is already rendered
+  Promise.resolve()
+    .then(()=>checkAdminAccess())
+    .catch(err=>console.error("Admin check error:",err));
+}
+
+async function checkAdminAccess(){
+  try{
+    const data=await adminApi("me");
+
+    const btn=document.getElementById("adminPanelBtn");
+
+    if(btn && data.isAdmin){
+      btn.classList.remove("hidden");
+    }
+  }catch(err){
+    console.error("Admin access check failed:",err);
+  }
 }
 
 
