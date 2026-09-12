@@ -633,7 +633,7 @@ function renderHome(p){
       <small>${balance>=0?"Today's remaining balance":"Watch today's spending"}</small>
     </div><div class="balance-arrow">${balance>=0?"↑":"↓"}</div>
   </article>
-  <div class="quote">✦<br><b>Discipline today,<br>financial freedom tomorrow.</b></div>`;
+    <div class="quote">𓆩♛𓆪<br><b>MANIYA,<br></b></div>`;
 }
 
 function renderHistory(p){
