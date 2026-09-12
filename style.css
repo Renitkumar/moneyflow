@@ -167,3 +167,10 @@ form{display:grid;gap:14px}.input-grid{display:grid;grid-template-columns:1fr 1f
 .download-range-note{display:flex;align-items:flex-start;gap:10px;padding:13px 14px;border-radius:17px;background:rgba(218,226,255,.62);border:1px solid rgba(255,255,255,.8);color:#6d7890;font-size:10px;line-height:1.5;margin-top:16px}.download-range-note span{width:22px;height:22px;flex:none;border-radius:50%;display:grid;place-items:center;background:#6476e9;color:#fff;font-weight:900}
 .download-range-preview{margin-top:12px;border:1px solid rgba(255,255,255,.82);border-radius:17px;background:rgba(255,255,255,.42);overflow:hidden}.download-range-preview>div{display:flex;justify-content:space-between;gap:12px;padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.65);font-size:10px}.download-range-preview>div:last-child{border-bottom:0}.download-range-preview span{color:#7b8596}.download-range-preview b{color:#4b5870;text-align:right}.download-range-preview .invalid{color:#b04c66;justify-content:center}
 @media(max-width:620px){.download-hero{padding-top:2px}.download-hero h2{font-size:25px}.download-icon{width:68px;height:68px;border-radius:22px;font-size:32px}.download-options{padding:9px;border-radius:24px}.download-option{padding:14px 12px}.download-date-card{padding:16px;border-radius:23px}}
+
+/* Authentication extras: Google sign-in + password reset */
+.auth-divider{display:flex;align-items:center;gap:12px;margin:14px 0;color:rgba(255,255,255,.55);font-size:13px}
+.auth-divider::before,.auth-divider::after{content:"";height:1px;flex:1;background:rgba(255,255,255,.16)}
+.google-btn{width:100%;display:flex;align-items:center;justify-content:center;gap:10px;padding:12px 16px;border:1px solid rgba(255,255,255,.18);border-radius:14px;background:rgba(255,255,255,.08);color:#fff;font-weight:600;cursor:pointer;transition:.2s ease}
+.google-btn:hover{background:rgba(255,255,255,.14);transform:translateY(-1px)}
+.google-icon{display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:#fff;color:#4285f4;font-weight:800;font-family:Arial,sans-serif}

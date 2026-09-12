@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
-import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updateProfile, getIdToken, GoogleAuthProvider, signInWithPopup, RecaptchaVerifier, signInWithPhoneNumber, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updateProfile, getIdToken, GoogleAuthProvider, signInWithPopup, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
 import { getFirestore, doc, setDoc, collection, addDoc, query, orderBy, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
 import { firebaseConfig } from "./firebase-config.js";
 
@@ -19,232 +19,95 @@ function toast(msg,type="info"){
   document.body.appendChild(e); setTimeout(()=>e.remove(),2800);
 }
 
-let phoneConfirmationResult = null;
-let phoneRecaptchaVerifier = null;
-
-function clearPhoneRecaptcha(){
-  try{
-    if(phoneRecaptchaVerifier){
-      phoneRecaptchaVerifier.clear();
-      phoneRecaptchaVerifier=null;
-    }
-  }catch(_){}
-}
-
-function setupPhoneRecaptcha(){
-  clearPhoneRecaptcha();
-  const box=document.getElementById("recaptcha-container");
-  if(!box)return null;
-  phoneRecaptchaVerifier=new RecaptchaVerifier(auth,"recaptcha-container",{
-    size:"invisible",
-    callback:()=>{}
-  });
-  return phoneRecaptchaVerifier;
-}
-
-function normaliseIndianPhone(value){
-  const digits=String(value||"").replace(/\D/g,"");
-  if(digits.length===10)return "+91"+digits;
-  if(digits.length===12 && digits.startsWith("91"))return "+"+digits;
-  return "";
-}
-
 function authView(mode="login"){
-  const register=mode==="register";
-  clearPhoneRecaptcha();
-  phoneConfirmationResult=null;
-
-  root.innerHTML=`<main class="auth-shell">
-    <div class="orb orb1"></div><div class="orb orb2"></div>
-    <section class="auth-card glass">
-      <div class="brand-mark">₹</div>
-      <h1>MoneyFlow</h1><p>Track Today, Build Tomorrow</p>
-
-      <div class="auth-methods" id="authMethods">
-        <button class="auth-method active" type="button" data-auth-method="email">✉️ <span>Email</span></button>
-        <button class="auth-method" type="button" data-auth-method="phone">📱 <span>Mobile</span></button>
-      </div>
-
-      <form id="authForm">
-        ${register?'<input id="name" placeholder="Full name" required>':""}
-        <div id="emailFields">
-          <input id="email" type="email" placeholder="Email address" required>
-          <input id="password" type="password" placeholder="Password" minlength="6" required>
-          <button class="primary wide" id="emailSubmit" type="submit">${register?"Create account":"Login"}</button>
-        </div>
-
-        <div id="phoneFields" class="hidden">
-          <input id="phone" type="tel" inputmode="numeric" autocomplete="tel" placeholder="Mobile number (10 digits)" maxlength="10">
-          <div id="recaptcha-container"></div>
-          <button class="primary wide" id="sendOtpBtn" type="button">Send OTP</button>
-
-          <div id="otpFields" class="hidden">
-            <input id="phoneOtp" type="text" inputmode="numeric" autocomplete="one-time-code" placeholder="Enter 6-digit OTP" maxlength="6">
-            <button class="primary wide" id="verifyOtpBtn" type="button">Verify & Login</button>
-            <button class="link-btn" id="changePhoneBtn" type="button">Change number</button>
-          </div>
-        </div>
-      </form>
-
-      <div class="auth-divider"><span>OR</span></div>
-      <button class="secondary wide google-btn" id="googleLogin" type="button">G&nbsp;&nbsp;Continue with Google</button>
-
-      ${!register?'<button class="link-btn" id="forgotPassword" type="button">Forgot Password?</button>':""}
-      <button class="link-btn" id="switch">${register?"Already have an account? Login":"New here? Create an account"}</button>
-      <small>Your financial data is stored securely per account.</small>
-    </section>
-  </main>`;
-
-  const emailFields=document.getElementById("emailFields");
-  const phoneFields=document.getElementById("phoneFields");
-  const authMethods=document.querySelectorAll("[data-auth-method]");
-
-  const setMethod=(method)=>{
-    authMethods.forEach(b=>b.classList.toggle("active",b.dataset.authMethod===method));
-    emailFields.classList.toggle("hidden",method!=="email");
-    phoneFields.classList.toggle("hidden",method!=="phone");
-    const email=document.getElementById("email");
-    const password=document.getElementById("password");
-    if(email)email.required=method==="email";
-    if(password)password.required=method==="email";
-    if(method==="phone")setTimeout(setupPhoneRecaptcha,0);
-    else clearPhoneRecaptcha();
-  };
-
-  authMethods.forEach(b=>b.onclick=()=>setMethod(b.dataset.authMethod));
-  document.getElementById("switch").onclick=()=>authView(register?"login":"register");
-
-  document.getElementById("authForm").onsubmit=async e=>{
-    e.preventDefault();
-    if(document.getElementById("emailFields").classList.contains("hidden"))return;
-    try{
-      const email=document.getElementById("email").value.trim();
-      const password=document.getElementById("password").value;
-      if(register){
-        const name=document.getElementById("name").value.trim();
-        const c=await createUserWithEmailAndPassword(auth,email,password);
-        await updateProfile(c.user,{displayName:name});
-        await setDoc(doc(db,"users",c.user.uid),{displayName:name,lockedUntil:null},{merge:true});
-        toast("Account created","success");
-      }else{
-        await signInWithEmailAndPassword(auth,email,password);
-      }
-    }catch(err){
-      toast(err.message.replace("Firebase: ",""),"error");
-    }
-  };
-
-  document.getElementById("googleLogin").onclick=async()=>{
-    try{
-      const provider=new GoogleAuthProvider();
-      const result=await signInWithPopup(auth,provider);
-      if(result?.user){
-        await setDoc(doc(db,"users",result.user.uid),{
-          displayName:result.user.displayName||"",
-          email:result.user.email||"",
-          lockedUntil:null
-        },{merge:true});
-      }
-      toast("Google login successful","success");
-    }catch(err){
-      if(err.code!=="auth/popup-closed-by-user")
-        toast(err.message.replace("Firebase: ",""),"error");
-    }
-  };
-
-  if(!register){
-    document.getElementById("forgotPassword").onclick=()=>{
-      const email=document.getElementById("email")?.value.trim()||"";
-      authView("forgot");
-      const input=document.getElementById("resetEmail");
-      if(input)input.value=email;
-    };
-  }
-
-  document.getElementById("sendOtpBtn").onclick=async()=>{
-    const phone=normaliseIndianPhone(document.getElementById("phone").value);
-    if(!phone)return toast("Enter a valid 10-digit Indian mobile number","error");
-
-    try{
-      const verifier=phoneRecaptchaVerifier||setupPhoneRecaptcha();
-      if(!verifier)return toast("Phone verification is not ready. Try again.","error");
-
-      const btn=document.getElementById("sendOtpBtn");
-      btn.disabled=true;
-      phoneConfirmationResult=await signInWithPhoneNumber(auth,phone,verifier);
-      document.getElementById("otpFields").classList.remove("hidden");
-      document.getElementById("phone").disabled=true;
-      btn.textContent="OTP Sent ✓";
-      toast("OTP sent to your mobile number","success");
-    }catch(err){
-      clearPhoneRecaptcha();
-      const msg=err.code==="auth/invalid-phone-number"
-        ?"Invalid mobile number"
-        :err.code==="auth/too-many-requests"
-        ?"Too many attempts. Please try again later."
-        :err.message.replace("Firebase: ","");
-      toast(msg,"error");
-      const btn=document.getElementById("sendOtpBtn");
-      if(btn){btn.disabled=false;btn.textContent="Send OTP";}
-      setTimeout(setupPhoneRecaptcha,0);
-    }
-  };
-
-  document.getElementById("verifyOtpBtn").onclick=async()=>{
-    const otp=document.getElementById("phoneOtp").value.trim();
-    if(!phoneConfirmationResult)return toast("Send OTP first","error");
-    if(!/^\d{6}$/.test(otp))return toast("Enter the 6-digit OTP","error");
-
-    try{
-      const result=await phoneConfirmationResult.confirm(otp);
-      const u=result.user;
-      await setDoc(doc(db,"users",u.uid),{
-        displayName:u.displayName||"",
-        phoneNumber:u.phoneNumber||"",
-        lockedUntil:null
-      },{merge:true});
-      toast("Mobile login successful","success");
-    }catch(err){
-      toast(err.message.replace("Firebase: ",""),"error");
-    }
-  };
-
-  document.getElementById("changePhoneBtn").onclick=()=>{
-    phoneConfirmationResult=null;
-    authView(register?"register":"login");
-    setTimeout(()=>document.querySelector('[data-auth-method="phone"]')?.click(),0);
-  };
-
   if(mode==="forgot"){
     root.innerHTML=`<main class="auth-shell">
       <div class="orb orb1"></div><div class="orb orb2"></div>
       <section class="auth-card glass">
         <div class="brand-mark">₹</div>
-        <h1>Reset Password</h1>
-        <p>We'll send a secure password reset link to your email.</p>
+        <h1>Reset Password</h1><p>Enter your email and we'll send you a reset link.</p>
         <form id="resetForm">
           <input id="resetEmail" type="email" placeholder="Email address" required>
-          <button class="primary wide" type="submit">Send Reset Email</button>
+          <button class="primary wide">Send Reset Link</button>
         </form>
-        <button class="link-btn" id="backToLogin" type="button">← Back to Login</button>
-        <small>Open the email and follow the secure Firebase reset link to create your new password.</small>
+        <button class="link-btn" id="backLogin">← Back to Login</button>
+        <small>Check your inbox and spam folder for the password reset email.</small>
       </section>
     </main>`;
 
-    document.getElementById("backToLogin").onclick=()=>authView("login");
+    document.getElementById("backLogin").onclick=()=>authView("login");
     document.getElementById("resetForm").onsubmit=async e=>{
       e.preventDefault();
-      const email=document.getElementById("resetEmail").value.trim();
       try{
+        const email=document.getElementById("resetEmail").value.trim();
         await sendPasswordResetEmail(auth,email);
-        toast("Password reset email sent. Check your inbox.","success");
+        toast("Password reset link sent to your email","success");
+        setTimeout(()=>authView("login"),1200);
       }catch(err){
-        toast(err.message.replace("Firebase: ",""),"error");
+        let msg=err.message.replace("Firebase: ","");
+        if(err.code==="auth/user-not-found")msg="No account found with this email.";
+        if(err.code==="auth/invalid-email")msg="Please enter a valid email address.";
+        toast(msg,"error");
       }
     };
+    return;
   }
-}
 
+  const register=mode==="register";
+  root.innerHTML=`<main class="auth-shell">
+    <div class="orb orb1"></div><div class="orb orb2"></div>
+    <section class="auth-card glass">
+      <div class="brand-mark">₹</div>
+      <h1>MoneyFlow</h1><p>Track Today, Build Tomorrow</p>
+      <form id="authForm">
+        ${register?'<input id="name" placeholder="Full name" required>':""}
+        <input id="email" type="email" placeholder="Email address" required>
+        <input id="password" type="password" placeholder="Password" minlength="6" required>
+        <button class="primary wide">${register?"Create account":"Login"}</button>
+      </form>
+      ${!register?'<button class="link-btn" id="forgotBtn">Forgot password?</button>':""}
+      <div class="auth-divider"><span>or</span></div>
+      <button class="google-btn" id="googleBtn" type="button"><span class="google-icon">G</span> Continue with Google</button>
+      <button class="link-btn" id="switch">${register?"Already have an account? Login":"New here? Create an account"}</button>
+      <small>Your financial data is stored securely per account.</small>
+    </section>
+  </main>`;
+
+  document.getElementById("switch").onclick=()=>authView(register?"login":"register");
+  if(!register)document.getElementById("forgotBtn").onclick=()=>authView("forgot");
+
+  document.getElementById("googleBtn").onclick=async()=>{
+    try{
+      const provider=new GoogleAuthProvider();
+      provider.setCustomParameters({prompt:"select_account"});
+      const result=await signInWithPopup(auth,provider);
+      await setDoc(doc(db,"users",result.user.uid),{
+        displayName:result.user.displayName||result.user.email?.split("@")[0]||"User",
+        email:result.user.email||"",
+        lockedUntil:null
+      },{merge:true});
+      toast("Signed in with Google","success");
+    }catch(err){
+      if(err.code!=="auth/popup-closed-by-user" && err.code!=="auth/cancelled-popup-request"){
+        toast(err.message.replace("Firebase: ",""),"error");
+      }
+    }
+  };
+
+  document.getElementById("authForm").onsubmit=async e=>{
+    e.preventDefault();
+    try{
+      const email=document.getElementById("email").value.trim(), password=document.getElementById("password").value;
+      if(register){
+        const name=document.getElementById("name").value.trim();
+        const c=await createUserWithEmailAndPassword(auth,email,password);
+        await updateProfile(c.user,{displayName:name});
+        await setDoc(doc(db,"users",c.user.uid),{displayName:name,email,lockedUntil:null},{merge:true});
+        toast("Account created","success");
+      }else await signInWithEmailAndPassword(auth,email,password);
+    }catch(err){toast(err.message.replace("Firebase: ",""),"error")}
+  };
+}
 function totals(rows=transactions){
   return {
     credit:rows.filter(t=>t.type==="credit").reduce((a,t)=>a+Number(t.amount),0),
@@ -588,22 +451,14 @@ function downloadAdminUserReport(user,txs,from,to){
 }
 
 function renderPage(){
-  const p=document.getElementById("page");
-  if(!p)return;
-
-  document.querySelectorAll("[data-page]").forEach(b=>{
-    b.classList.toggle("active",b.dataset.page===currentPage);
-  });
-
+  const p=document.getElementById("page"); if(!p)return;
+  document.querySelectorAll("[data-page]").forEach(b=>b.classList.toggle("active",b.dataset.page===currentPage));
+  requestAnimationFrame(updateLiquidLens);
   if(currentPage==="home")renderHome(p);
   if(currentPage==="history")renderHistory(p);
   if(currentPage==="add")renderAdd(p);
   if(currentPage==="download")renderDownload(p);
   if(currentPage==="admin")renderAdmin(p);
-
-  requestAnimationFrame(()=>{
-    updateLiquidLens();
-  });
 }
 
 function renderHome(p){
@@ -733,132 +588,50 @@ function dailyRows(f,t){
   return dates;
 }
 
-let downloadMode = "choose";
-
 function renderDownload(p){
-  if(downloadMode === "range"){
-    renderDownloadRange(p);
-    return;
-  }
-
-  const today=todayKey();
-  p.innerHTML=`<section class="download-page">
-    <div class="download-hero">
-      <div class="download-icon">↓</div>
-      <div class="eyebrow">EXPORT</div>
-      <h2>Download Data</h2>
-      <p>Choose how you want to download your transaction report.</p>
-    </div>
-
-    <section class="download-options glass">
-      <button class="download-option selected" id="downloadTodayOption" type="button">
-        <span class="download-option-icon">◷</span>
-        <span class="download-option-copy"><b>Today</b><small>Download today's transactions</small></span>
-        <span class="download-option-arrow">›</span>
-      </button>
-      <button class="download-option" id="downloadRangeOption" type="button">
-        <span class="download-option-icon">▣</span>
-        <span class="download-option-copy"><b>To – From</b><small>Select a custom date range</small></span>
-        <span class="download-option-arrow">›</span>
-      </button>
-    </section>
-
-    <button class="primary wide download-main-btn" id="downloadToday">↓&nbsp; Download</button>
-    <p class="download-help">Today's report contains only transactions recorded today.</p>
+  p.innerHTML=`<div class="page-head">
+    <div><div class="eyebrow">EXPORT</div><h2>Download report</h2><p class="muted">Create a day-wise Positive / Negative report.</p></div>
+  </div>
+  <section class="download-card glass"><p class="muted">Select dates. The downloaded report keeps each day separate instead of mixing the whole range.</p>
+    <div class="input-grid"><label>From<input id="from" type="date"></label><label>To<input id="to" type="date" value="${iso(new Date())}"></label></div>
+    <div id="preview"></div><button class="primary wide" id="download">↓ Download Daily Report</button>
   </section>`;
-
-  document.getElementById("downloadRangeOption").onclick=()=>{
-    downloadMode="range";
-    renderPage();
-  };
-
-  document.getElementById("downloadToday").onclick=()=>{
-    const rows=range(today,today);
-    if(!rows.length)return toast("No transactions for today","error");
-    downloadCsvReport(today,today,rows,"Today");
-  };
-}
-
-function renderDownloadRange(p){
-  const today=todayKey();
-  p.innerHTML=`<section class="download-page download-range-page">
-    <button class="download-back" id="downloadBack" type="button">←</button>
-    <div class="download-hero">
-      <div class="download-icon">▣</div>
-      <div class="eyebrow">DATE RANGE</div>
-      <h2>Select Date Range</h2>
-      <p>Choose the start and end date for your transactions.</p>
-    </div>
-
-    <section class="download-date-card glass">
-      <label>From Date<input id="downloadFrom" type="date"></label>
-      <label>To Date<input id="downloadTo" type="date" value="${today}"></label>
-      <div class="download-range-note"><span>i</span><div>Choose any date range to download the transactions recorded in that period.</div></div>
-      <div id="downloadRangePreview" class="download-range-preview"></div>
-    </section>
-
-    <button class="primary wide download-main-btn" id="downloadRange">↓&nbsp; Download</button>
-  </section>`;
-
-  const f=document.getElementById("downloadFrom");
-  const t=document.getElementById("downloadTo");
-  const first=transactions.length?iso(new Date(Math.min(...transactions.map(x=>new Date(x.date).getTime())))):today;
-  f.value=first;
-
+  const f=document.getElementById("from"),t=document.getElementById("to");
+  f.value=transactions.length?iso(new Date(Math.min(...transactions.map(x=>new Date(x.date).getTime())))):iso(new Date());
   const preview=()=>{
-    const valid=f.value&&t.value&&f.value<=t.value;
-    const rows=valid?dailyRows(f.value,t.value):[];
-    const selected=valid?range(f.value,t.value):[];
-    const {credit,debit}=totals(selected);
-    document.getElementById("downloadRangePreview").innerHTML=valid
-      ? `<div><span>Selected range</span><b>${dateText(f.value)} – ${dateText(t.value)}</b></div><div><span>Transactions</span><b>${selected.length}</b></div><div><span>Remaining</span><b>${money(credit-debit)}</b></div>`
-      : `<div class="invalid">Please select a valid From and To date.</div>`;
+    const rows=dailyRows(f.value,t.value);
+    const c=rows.reduce((a,x)=>a+x.credit,0),d=rows.reduce((a,x)=>a+x.debit,0),count=rows.reduce((a,x)=>a+x.count,0);
+    document.getElementById("preview").innerHTML=`<div class="report-total"><span>Positive<b>${money(c)}</b></span><span>Negative<b>${money(d)}</b></span><span>Remaining<b>${money(c-d)}</b></span></div>
+      <div class="daily-preview">${rows.slice(-7).reverse().map(x=>`<div><b>${dateText(x.date)}</b><span class="positive-text">+${money(x.credit)}</span><span class="negative-text">−${money(x.debit)}</span><strong>${money(x.balance)}</strong></div>`).join("")}${rows.length>7?`<small>Showing latest 7 days in preview · ${rows.length} days in the report</small>`:""}</div>
+      <small>${count} transactions across ${rows.length} day${rows.length===1?"":"s"}</small>`;
   };
-
-  f.onchange=t.onchange=preview;
-  preview();
-
-  document.getElementById("downloadBack").onclick=()=>{
-    downloadMode="choose";
-    renderPage();
+  f.onchange=t.onchange=preview; preview();
+  document.getElementById("download").onclick=()=>{
+    const rows=dailyRows(f.value,t.value);
+    const r=range(f.value,t.value);
+    if(!r.length)return toast("No transactions in this range","error");
+    const totalC=rows.reduce((a,x)=>a+x.credit,0),totalD=rows.reduce((a,x)=>a+x.debit,0);
+    const generated=new Date().toLocaleString("en-IN");
+    const csv=[
+      ["MONEYFLOW DAILY REPORT"],
+      ["From",f.value,"To",t.value],
+      ["Generated",generated],
+      [],
+      ["Date","Positive (₹)","Negative (₹)","Remaining (₹)"],
+      ...rows.map(x=>[x.date,x.credit.toFixed(2),x.debit.toFixed(2),x.balance.toFixed(2)]),
+      [],
+      ["TOTAL",totalC.toFixed(2),totalD.toFixed(2),(totalC-totalD).toFixed(2)],
+      [],
+      ["TRANSACTION DETAILS"],
+      ["Date","Type","Description","Amount (₹)"],
+      ...r.map(x=>[x.date,x.type==="credit"?"Positive":"Negative",x.note,Number(x.amount).toFixed(2)])
+    ].map(row=>row.map(v=>`"${String(v??"").replace(/"/g,'""')}"`).join(",")).join("\n");
+    const a=document.createElement("a");
+    a.href=URL.createObjectURL(new Blob(["\ufeff"+csv],{type:"text/csv;charset=utf-8"}));
+    a.download=`moneyflow_daily_${f.value}_to_${t.value}.csv`;
+    a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href),1000);
   };
-
-  document.getElementById("downloadRange").onclick=()=>{
-    if(!f.value||!t.value||f.value>t.value)return toast("Please select a valid date range","error");
-    const rows=range(f.value,t.value);
-    if(!rows.length)return toast("No transactions in this range","error");
-    downloadCsvReport(f.value,t.value,rows,"Date Range");
-  };
-}
-
-function downloadCsvReport(fromDate,toDate,rows,label){
-  const daily=dailyRows(fromDate,toDate);
-  const {credit,debit}=totals(rows);
-  const generated=new Date().toLocaleString("en-IN");
-  const csv=[
-    ["MONEYFLOW TRANSACTION REPORT"],
-    ["Report",label],
-    ["From",fromDate,"To",toDate],
-    ["Generated",generated],
-    [],
-    ["Date","Positive (₹)","Negative (₹)","Remaining (₹)"],
-    ...daily.map(x=>[x.date,x.credit.toFixed(2),x.debit.toFixed(2),x.balance.toFixed(2)]),
-    [],
-    ["TOTAL",credit.toFixed(2),debit.toFixed(2),(credit-debit).toFixed(2)],
-    [],
-    ["TRANSACTION DETAILS"],
-    ["Date","Type","Description","Amount (₹)"],
-    ...rows.map(x=>[x.date,x.type==="credit"?"Positive":"Negative",x.note,Number(x.amount).toFixed(2)])
-  ].map(row=>row.map(v=>`"${String(v??"").replace(/"/g,'""')}"`).join(",")).join("\n");
-
-  const a=document.createElement("a");
-  a.href=URL.createObjectURL(new Blob(["\ufeff"+csv],{type:"text/csv;charset=utf-8"}));
-  a.download=fromDate===toDate
-    ? `moneyflow_${fromDate}.csv`
-    : `moneyflow_${fromDate}_to_${toDate}.csv`;
-  a.click();
-  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
-  toast("Report downloaded successfully","success");
 }
 function range(f,t){return transactions.filter(x=>x.date>=f&&x.date<=t).sort((a,b)=>b.date.localeCompare(a.date))}
 
