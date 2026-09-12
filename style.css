@@ -168,11 +168,6 @@ form{display:grid;gap:14px}.input-grid{display:grid;grid-template-columns:1fr 1f
 .download-range-preview{margin-top:12px;border:1px solid rgba(255,255,255,.82);border-radius:17px;background:rgba(255,255,255,.42);overflow:hidden}.download-range-preview>div{display:flex;justify-content:space-between;gap:12px;padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.65);font-size:10px}.download-range-preview>div:last-child{border-bottom:0}.download-range-preview span{color:#7b8596}.download-range-preview b{color:#4b5870;text-align:right}.download-range-preview .invalid{color:#b04c66;justify-content:center}
 @media(max-width:620px){.download-hero{padding-top:2px}.download-hero h2{font-size:25px}.download-icon{width:68px;height:68px;border-radius:22px;font-size:32px}.download-options{padding:9px;border-radius:24px}.download-option{padding:14px 12px}.download-date-card{padding:16px;border-radius:23px}}
 
-/* Authentication extras: Google sign-in + password reset */
-.auth-divider{display:flex;align-items:center;gap:12px;margin:14px 0;color:rgba(255,255,255,.55);font-size:13px}
-.auth-divider::before,.auth-divider::after{content:"";height:1px;flex:1;background:rgba(255,255,255,.16)}
-.google-btn{width:100%;display:flex;align-items:center;justify-content:center;gap:10px;padding:12px 16px;border:1px solid rgba(255,255,255,.18);border-radius:14px;background:rgba(255,255,255,.08);color:#fff;font-weight:600;cursor:pointer;transition:.2s ease}
-.google-btn:hover{background:rgba(255,255,255,.14);transform:translateY(-1px)}
 .google-icon{display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:#fff;color:#4285f4;font-weight:800;font-family:Arial,sans-serif}
 
 
@@ -188,3 +183,11 @@ form{display:grid;gap:14px}.input-grid{display:grid;grid-template-columns:1fr 1f
 .logout-confirm-actions .secondary{border:1px solid rgba(255,255,255,.28);background:rgba(255,255,255,.12);color:inherit}
 @keyframes logoutModalIn{from{opacity:0}to{opacity:1}}
 @keyframes logoutCardIn{from{opacity:0;transform:translateY(10px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
+
+/* ===== WATER LIQUID GLASS NAVIGATION ===== */
+.liquid-nav.glass{background:rgba(255,255,255,.055)!important;border:1px solid rgba(255,255,255,.30)!important;box-shadow:0 16px 45px rgba(35,55,85,.16),inset 0 1px 1px rgba(255,255,255,.42),inset 0 -1px 1px rgba(40,70,105,.08)!important;backdrop-filter:blur(18px) saturate(155%)!important;-webkit-backdrop-filter:blur(18px) saturate(155%)!important}
+.liquid-nav:before{background:linear-gradient(135deg,rgba(255,255,255,.10),rgba(180,225,255,.035) 45%,rgba(255,255,255,.07))!important}
+.liquid-nav:after{border-color:rgba(255,255,255,.34)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.48),inset 0 -1px 0 rgba(80,125,165,.08)!important}
+.liquid-nav .liquid-lens{background:linear-gradient(135deg,rgba(255,255,255,.13),rgba(185,225,255,.06),rgba(255,255,255,.10))!important;border-color:rgba(255,255,255,.42)!important;box-shadow:0 8px 24px rgba(35,70,105,.13),inset 0 1px 2px rgba(255,255,255,.60),inset 0 -5px 12px rgba(100,160,195,.08)!important;backdrop-filter:blur(12px) saturate(170%)!important;-webkit-backdrop-filter:blur(12px) saturate(170%)!important}
+.liquid-nav .liquid-lens:before{background:radial-gradient(ellipse at 30% 15%,rgba(255,255,255,.20),transparent 35%),radial-gradient(ellipse at 75% 90%,rgba(120,205,255,.08),transparent 42%)!important}
+.liquid-nav .liquid-lens:after{background:rgba(255,255,255,.28)!important;opacity:.28!important}
