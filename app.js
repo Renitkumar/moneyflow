@@ -1,13 +1,15 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updateProfile, getIdToken, GoogleAuthProvider, signInWithPopup, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
 import { getFirestore, doc, setDoc, collection, addDoc, query, orderBy, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
+import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-storage.js";
 import { firebaseConfig } from "./firebase-config.js";
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
+const storage = getStorage(app);
 const root = document.getElementById("app");
-let currentUser = null, transactions = [], unsubscribe = null, currentPage = "home", dailyTimer = null;
+let currentUser = null, transactions = [], unsubscribe = null, currentPage = "home", dailyTimer = null, profileSaving = false;
 
 const money = n => `₹${Number(n || 0).toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2})}`;
 const esc = s => String(s ?? "").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
@@ -163,7 +165,7 @@ function shell(){
       <div class="brand"><span>₹</span><div><b>MoneyFlow</b><small>Track Today, Build Tomorrow</small></div></div>
       <div class="header-actions">
         <button id="adminPanelBtn" class="admin-panel-btn hidden">⚙ Admin Panel</button>
-        <div class="user-chip">${esc(currentUser?.displayName||currentUser?.email||"User")}</div>
+        <button id="profileChip" class="user-chip" type="button">${currentUser?.photoURL?`<img src="${esc(currentUser.photoURL)}" alt="">`:`<span class="user-chip-avatar">${esc((currentUser?.displayName||currentUser?.email||"U").slice(0,1).toUpperCase())}</span>`}<span>${esc(currentUser?.displayName||currentUser?.email||"User")}</span></button>
       </div>
     </header>
     <main class="content"><section id="page"></section></main>
@@ -188,6 +190,7 @@ function shell(){
       toast(err.message.replace("Firebase: ",""),"error");
     }
   };
+  document.getElementById("profileChip").onclick=()=>{ currentPage="profile"; renderPage(); };
   document.getElementById("adminPanelBtn").onclick=()=>{ currentPage="admin"; renderPage(); };
   setupLiquidNavigation();
   checkAdminAccess();
@@ -317,7 +320,7 @@ async function renderAdmin(p){
   p.innerHTML=`<div class="admin-shell">
     <div class="admin-head">
       <div><div class="eyebrow">ADMIN CONTROL</div><h2>Admin Panel</h2><p class="muted">Manage users and correct transactions securely.</p></div>
-      <button class="secondary" id="backHome">← Home</button>
+      <div class="admin-head-actions"><button class="icon-btn feedback-admin-btn" id="feedbackAdminBtn" title="Feedbacks" aria-label="Feedbacks">💬</button><button class="secondary" id="backHome">← Home</button></div>
     </div>
     <div class="admin-stats" id="adminStats"><div class="admin-stat glass"><b>Loading…</b><small>Users</small></div></div>
     <section class="admin-card glass">
@@ -325,6 +328,7 @@ async function renderAdmin(p){
       <div id="adminUsers" class="admin-users"><div class="admin-loading">Loading users…</div></div>
     </section>
   </div>`;
+  document.getElementById("feedbackAdminBtn").onclick=()=>{currentPage="feedback";renderPage()};
   document.getElementById("backHome").onclick=()=>{currentPage="home";renderPage()};
   try{
     const data=await adminApi("users");
@@ -491,15 +495,106 @@ function downloadAdminUserReport(user,txs,from,to){
   setTimeout(()=>URL.revokeObjectURL(a.href),1000);
 }
 
+async function saveProfileName(name){
+  const clean=String(name||"").trim();
+  if(!clean)return toast("Please enter your name","error");
+  if(profileSaving)return;
+  profileSaving=true;
+  try{
+    await updateProfile(currentUser,{displayName:clean});
+    await setDoc(doc(db,"users",currentUser.uid),{displayName:clean,email:currentUser.email||"",photoURL:currentUser.photoURL||"",updatedAt:serverTimestamp()},{merge:true});
+    toast("Profile updated","success");
+    renderPage();
+  }catch(e){toast(e.message.replace("Firebase: ",""),"error")}
+  finally{profileSaving=false;}
+}
+
+async function uploadProfileImage(file){
+  if(!file)return;
+  if(!file.type.startsWith("image/"))return toast("Please select an image file","error");
+  if(file.size>5*1024*1024)return toast("Image must be smaller than 5 MB","error");
+  if(profileSaving)return;
+  profileSaving=true;
+  try{
+    toast("Uploading profile image…","info");
+    const ext=(file.name.split(".").pop()||"jpg").toLowerCase().replace(/[^a-z0-9]/g,"")||"jpg";
+    const r=storageRef(storage,`users/${currentUser.uid}/profile.${ext}`);
+    await uploadBytes(r,file,{contentType:file.type});
+    const url=await getDownloadURL(r);
+    await updateProfile(currentUser,{photoURL:url});
+    await setDoc(doc(db,"users",currentUser.uid),{displayName:currentUser.displayName||"",email:currentUser.email||"",photoURL:url,updatedAt:serverTimestamp()},{merge:true});
+    toast("Profile photo updated","success");
+    renderPage();
+  }catch(e){toast(e.message.replace("Firebase: ",""),"error")}
+  finally{profileSaving=false;}
+}
+
+function renderProfile(p){
+  const name=currentUser?.displayName||currentUser?.email?.split("@")[0]||"User";
+  const photo=currentUser?.photoURL||"";
+  p.innerHTML=`<section class="profile-page">
+    <div class="profile-head">
+      <div><div class="eyebrow">ACCOUNT</div><h2>My Profile</h2><p class="muted">Manage your name, profile photo and feedback.</p></div>
+      <button class="secondary" id="profileBack">← Home</button>
+    </div>
+    <section class="profile-card glass">
+      <div class="profile-avatar-wrap">
+        <div class="profile-avatar">${photo?`<img src="${esc(photo)}" alt="Profile photo">`:`<span>${esc(name.slice(0,1).toUpperCase())}</span>`}</div>
+        <label class="profile-image-btn" for="profileImageInput">＋ Add new image</label>
+        <input id="profileImageInput" type="file" accept="image/*" hidden>
+        <small>JPG, PNG or other image · max 5 MB</small>
+      </div>
+      <div class="profile-form">
+        <label>Your name<input id="profileName" maxlength="60" value="${esc(name)}"></label>
+        <label>Email address<input value="${esc(currentUser?.email||"")}" disabled></label>
+        <button class="primary wide" id="saveProfile">Save changes</button>
+      </div>
+    </section>
+    <section class="profile-feedback glass">
+      <div class="profile-section-icon">💬</div>
+      <div><h3>Feedback</h3><p class="muted">Tell us what you like, what is confusing, or what we can improve.</p></div>
+      <textarea id="feedbackText" maxlength="1000" placeholder="Write your feedback here…"></textarea>
+      <button class="primary wide" id="sendFeedback">Send feedback</button>
+    </section>
+  </section>`;
+  document.getElementById("profileBack").onclick=()=>{currentPage="home";renderPage()};
+  document.getElementById("profileImageInput").onchange=e=>uploadProfileImage(e.target.files?.[0]);
+  document.getElementById("saveProfile").onclick=()=>saveProfileName(document.getElementById("profileName").value);
+  document.getElementById("sendFeedback").onclick=async()=>{
+    const text=document.getElementById("feedbackText").value.trim();
+    if(!text)return toast("Please write some feedback first","error");
+    try{
+      await addDoc(collection(db,"users",currentUser.uid,"feedback"),{text,uid:currentUser.uid,email:currentUser.email||"",displayName:currentUser.displayName||name,createdAt:serverTimestamp()});
+      document.getElementById("feedbackText").value="";
+      toast("Thanks for your feedback","success");
+    }catch(e){toast(e.message,"error")}
+  };
+}
+
+async function renderFeedbacks(p){
+  p.innerHTML=`<section class="admin-shell">
+    <div class="admin-head"><div><div class="eyebrow">USER FEEDBACK</div><h2>Feedbacks</h2><p class="muted">Messages submitted by MoneyFlow users.</p></div><button class="secondary" id="backAdmin">← Admin</button></div>
+    <section class="admin-card glass"><div id="feedbackList" class="feedback-list"><div class="admin-loading">Loading feedbacks…</div></div></section>
+  </section>`;
+  document.getElementById("backAdmin").onclick=()=>{currentPage="admin";renderPage()};
+  try{
+    const data=await adminApi("feedbacks");
+    const rows=data.feedbacks||[];
+    document.getElementById("feedbackList").innerHTML=rows.length?rows.map(f=>`<article class="feedback-item"><div class="feedback-item-head"><div><b>${esc(f.displayName||"User")}</b><span>${esc(f.email||"")}</span></div><small>${esc(f.createdAtText||"")}</small></div><p>${esc(f.text||"")}</p></article>`).join(""):`<div class="empty"><div>💬</div><h3>No feedback yet</h3><p>User feedback will appear here.</p></div>`;
+  }catch(e){document.getElementById("feedbackList").innerHTML=`<div class="admin-error">${esc(e.message)}</div>`}
+}
+
 function renderPage(){
   const p=document.getElementById("page"); if(!p)return;
   document.querySelectorAll("[data-page]").forEach(b=>b.classList.toggle("active",b.dataset.page===currentPage));
   requestAnimationFrame(updateLiquidLens);
   if(currentPage==="home")renderHome(p);
+  if(currentPage==="profile")renderProfile(p);
   if(currentPage==="history")renderHistory(p);
   if(currentPage==="add")renderAdd(p);
   if(currentPage==="download")renderDownload(p);
   if(currentPage==="admin")renderAdmin(p);
+  if(currentPage==="feedback")renderFeedbacks(p);
 }
 
 function renderHome(p){
@@ -508,7 +603,7 @@ function renderHome(p){
   p.innerHTML=`<section class="hero">
     <div><div class="eyebrow">OVERVIEW · ${today}</div>
       <h1>Good ${new Date().getHours()<12?"Morning":new Date().getHours()<18?"Afternoon":"Evening"}<br>
-      <strong>${esc(currentUser?.displayName?.split(" ")[0]||"there")}</strong> 👋</h1>
+      <strong class="home-user"><span class="home-user-avatar">${currentUser?.photoURL?`<img src="${esc(currentUser.photoURL)}" alt="">`:`${esc((currentUser?.displayName?.split(" ")[0]||"there").slice(0,1).toUpperCase())}`}</span>${esc(currentUser?.displayName?.split(" ")[0]||"there")}</strong> 👋</h1>
       <p>Small steps. Big results.</p>
     </div>
     <div class="floating-cube">₹<span>✦</span></div>

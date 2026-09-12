@@ -14,6 +14,15 @@ service cloud.firestore {
                     && (!resource.data.lockedUntil || resource.data.lockedUntil < request.time);
       allow delete: if false;
 
+      match /feedback/{feedbackId} {
+        allow create: if request.auth != null && request.auth.uid == userId
+          && request.resource.data.uid == userId
+          && request.resource.data.text is string
+          && request.resource.data.text.size() > 0
+          && request.resource.data.text.size() <= 1000;
+        allow read, update, delete: if false;
+      }
+
       match /transactions/{transactionId} {
         allow read, create: if request.auth != null
                             && request.auth.uid == userId
