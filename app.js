@@ -105,160 +105,107 @@ function updateLiquidLens(){
   const nr=nav.getBoundingClientRect(), ar=active.getBoundingClientRect();
   lens.style.width=`${ar.width}px`;
   lens.style.height=`${ar.height}px`;
-  lens.style.borderRadius="22px";
+  lens.style.borderRadius="20px";
+  lens.style.transition="transform .45s cubic-bezier(.16,1,.3,1),height .2s ease";
   lens.style.transform=`translate3d(${ar.left-nr.left}px,${ar.top-nr.top}px,0) scaleX(1) scaleY(1)`;
 }
 
 function setupLiquidNavigation(){
   const nav=document.getElementById("bottomNav"), lens=document.getElementById("liquidLens");
   if(!nav || !lens)return;
-
   const pages=["home","history","add","download"];
-  let dragging=false;
-  let moved=false;
-  let startX=0,startY=0,startIndex=0;
-  let pointerId=null;
+  let dragging=false,moved=false,pointerId=null,startX=0,startY=0,startIndex=0;
   let ignoreClickUntil=0;
-
   const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
   const buttons=()=>pages.map(p=>nav.querySelector(`[data-page="${p}"]`)).filter(Boolean);
 
   function placeLens(index,animate=true){
-    const bs=buttons();
-    if(!bs.length)return;
+    const bs=buttons(); if(!bs.length)return;
     index=clamp(index,0,bs.length-1);
-    const b=bs[index];
-    const nr=nav.getBoundingClientRect(), br=b.getBoundingClientRect();
+    const b=bs[index],nr=nav.getBoundingClientRect(),br=b.getBoundingClientRect();
     lens.style.width=`${br.width}px`;
     lens.style.height=`${br.height}px`;
     lens.style.borderRadius="20px";
-    lens.style.transition=animate
-      ? "transform .48s cubic-bezier(.16,1,.3,1),width .2s ease,height .2s ease,border-radius .2s ease"
-      : "none";
+    lens.style.transition=animate?"transform .45s cubic-bezier(.16,1,.3,1),height .2s ease":"none";
     lens.style.transform=`translate3d(${br.left-nr.left}px,${br.top-nr.top}px,0) scaleX(1) scaleY(1)`;
   }
 
-  function paintLens(centerX,scaleX=1,scaleY=1){
-    const bs=buttons();
-    if(!bs.length)return;
-    const nr=nav.getBoundingClientRect();
-    const base=bs[startIndex];
-    if(!base)return;
-    const br=base.getBoundingClientRect();
-    const baseWidth=br.width;
-    const expanded=baseWidth*scaleX;
-    const maxLeft=Math.max(6,nr.width-expanded-6);
-    const left=clamp(centerX-nr.left-expanded/2,6,maxLeft);
-    lens.style.width=`${baseWidth}px`;
-    lens.style.height=`${br.height}px`;
-    lens.style.borderRadius=`${Math.max(16,20/scaleX)}px`;
+  function paintLens(centerX,heightScale=1){
+    const base=buttons()[startIndex]; if(!base)return;
+    const nr=nav.getBoundingClientRect(),br=base.getBoundingClientRect();
+    const h=br.height*heightScale;
+    const left=clamp(centerX-nr.left-br.width/2,6,nr.width-br.width-6);
+    lens.style.width=`${br.width}px`;                 // WIDTH NEVER CHANGES
+    lens.style.height=`${h}px`;                       // HEIGHT stretches only
+    lens.style.borderRadius="20px";
     lens.style.transition="none";
-    lens.style.transform=
-      `translate3d(${left}px,${br.top-nr.top-(br.height*(scaleY-1)/2)}px,0) `+
-      `scaleX(${scaleX}) scaleY(${scaleY})`;
+    lens.style.transform=`translate3d(${left}px,${br.top-nr.top-(h-br.height)/2}px,0) scaleX(1) scaleY(1)`;
   }
 
-  function currentLensCenter(){
-    const m=lens.style.transform.match(/translate3d\(([-\d.]+)px,\s*[-\d.]+px,\s*0\)\s*scaleX\(([-\d.]+)\)/);
-    if(!m)return null;
-    const nr=nav.getBoundingClientRect();
-    const left=parseFloat(m[1]);
-    const sx=parseFloat(m[2])||1;
-    return nr.left+left+(lens.offsetWidth*sx)/2;
-  }
-
-  function nearestIndex(){
-    const center=currentLensCenter();
-    if(center===null)return startIndex;
-    let best=startIndex, distance=Infinity;
-    buttons().forEach((b,i)=>{
-      const r=b.getBoundingClientRect();
-      const d=Math.abs((r.left+r.width/2)-center);
-      if(d<distance){distance=d;best=i;}
-    });
+  function nearestIndexFromX(x){
+    let best=0,dist=Infinity;
+    buttons().forEach((b,i)=>{const r=b.getBoundingClientRect(),d=Math.abs(x-(r.left+r.width/2));if(d<dist){dist=d;best=i;}});
     return best;
   }
 
   function openPage(index){
-    const page=pages[clamp(index,0,pages.length-1)];
-    currentPage=page;
+    currentPage=pages[clamp(index,0,pages.length-1)];
     renderPage();
   }
 
-  // One and only one navigation click handler.
-  // Normal taps never depend on pointerup/pointercapture.
+  // Normal click/tap always opens the selected page.
   nav.addEventListener("click",e=>{
     const button=e.target.closest?.("[data-page]");
     if(!button)return;
-    if(performance.now()<ignoreClickUntil){
-      e.preventDefault();
-      e.stopPropagation();
-      return;
-    }
-    const index=pages.indexOf(button.dataset.page);
-    if(index>=0)openPage(index);
+    if(performance.now()<ignoreClickUntil){e.preventDefault();e.stopPropagation();return;}
+    const i=pages.indexOf(button.dataset.page);
+    if(i>=0)openPage(i);
   });
 
   nav.addEventListener("pointerdown",e=>{
     if(e.pointerType==="mouse" && e.button!==0)return;
     const button=e.target.closest?.("[data-page]");
     if(!button)return;
-    const index=pages.indexOf(button.dataset.page);
-    if(index<0)return;
-
+    const i=pages.indexOf(button.dataset.page); if(i<0)return;
     const r=button.getBoundingClientRect();
-    dragging=true;
-    moved=false;
-    pointerId=e.pointerId;
-    startX=e.clientX;
-    startY=e.clientY;
-    startIndex=index;
+    dragging=true;moved=false;pointerId=e.pointerId;startX=e.clientX;startY=e.clientY;startIndex=i;
     nav.classList.add("swiping","dragging");
-    paintLens(r.left+r.width/2,1,1);
-    // No pointer capture: native click remains reliable.
+    paintLens(r.left+r.width/2,1);
   });
 
-  nav.addEventListener("pointermove",e=>{
+  function move(e){
     if(!dragging || e.pointerId!==pointerId)return;
-    const dx=e.clientX-startX;
-    const dy=e.clientY-startY;
-
+    const dx=e.clientX-startX,dy=e.clientY-startY;
     if(!moved){
       if(Math.abs(dx)<8)return;
       if(Math.abs(dx)<Math.abs(dy)*0.7)return;
       moved=true;
     }
-
     e.preventDefault();
-    const nr=nav.getBoundingClientRect();
-    const base=nav.querySelector(`[data-page="${pages[startIndex]}"]`);
-    if(!base)return;
-    const br=base.getBoundingClientRect();
     const travel=Math.abs(dx);
-    const scaleX=1+Math.min(.55,(travel/Math.max(120,nr.width))*.82);
-    const scaleY=1+Math.min(.07,(travel/Math.max(120,nr.width))*.10);
-    paintLens(br.left+br.width/2+dx,scaleX,scaleY);
-  },{passive:false});
+    const heightScale=1+Math.min(.10,(travel/180)*.10); // max +10% height
+    const base=buttons()[startIndex]; if(!base)return;
+    paintLens(base.getBoundingClientRect().left+base.getBoundingClientRect().width/2+dx,heightScale);
+  }
 
-  function endDrag(e){
+  function end(e){
     if(!dragging || e.pointerId!==pointerId)return;
     const wasMoved=moved;
-    dragging=false;
-    nav.classList.remove("swiping","dragging");
-
+    dragging=false;nav.classList.remove("swiping","dragging");
     if(wasMoved){
       e.preventDefault();
-      ignoreClickUntil=performance.now()+300;
-      openPage(nearestIndex());
+      ignoreClickUntil=performance.now()+350;
+      // IMPORTANT: choose the page from the ACTUAL release position.
+      openPage(nearestIndexFromX(e.clientX));
     }
-
-    moved=false;
-    pointerId=null;
+    moved=false;pointerId=null;
     requestAnimationFrame(()=>placeLens(pages.indexOf(currentPage),true));
   }
 
-  nav.addEventListener("pointerup",endDrag);
-  nav.addEventListener("pointercancel",endDrag);
+  // Listen on the document so release still works even if the finger leaves the bar.
+  document.addEventListener("pointermove",move,{passive:false});
+  document.addEventListener("pointerup",end,{passive:false});
+  document.addEventListener("pointercancel",end,{passive:false});
   window.addEventListener("resize",()=>requestAnimationFrame(()=>placeLens(pages.indexOf(currentPage),false)));
   requestAnimationFrame(()=>placeLens(pages.indexOf(currentPage),false));
 }

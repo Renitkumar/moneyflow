@@ -208,3 +208,32 @@ form{display:grid;gap:14px}.input-grid{display:grid;grid-template-columns:1fr 1f
   .bottom-nav button,.liquid-nav button{height:54px!important}
   .bottom-nav .add-nav i,.liquid-nav .add-nav i{width:46px!important;height:46px!important}
 }
+
+/* FINAL V9 LIQUID GLASS NAVIGATION */
+.bottom-nav{
+  background:rgba(255,255,255,.025)!important;
+  backdrop-filter:blur(1px) saturate(105%)!important;
+  -webkit-backdrop-filter:blur(1px) saturate(105%)!important;
+  border:1px solid rgba(255,255,255,.42)!important;
+  overflow:hidden!important;
+  height:76px!important;
+  align-items:stretch;
+}
+.bottom-nav .add-nav{margin-top:0!important;padding-top:6px!important;align-self:stretch!important;overflow:visible!important}
+.bottom-nav .add-nav i{width:39px!important;height:39px!important;font-size:23px!important;border-radius:13px!important}
+.liquid-nav .liquid-lens{
+  z-index:2!important;
+  width:auto;
+  background:rgba(255,255,255,.045)!important;
+  border:1px solid rgba(255,255,255,.62)!important;
+  box-shadow:0 7px 18px rgba(25,35,55,.08),inset 0 1px 2px rgba(255,255,255,.72),inset 0 -2px 5px rgba(70,80,100,.035)!important;
+  backdrop-filter:blur(1.5px) saturate(110%)!important;
+  -webkit-backdrop-filter:blur(1.5px) saturate(110%)!important;
+}
+.liquid-nav .liquid-lens:before{background:radial-gradient(ellipse at 30% 10%,rgba(255,255,255,.18),transparent 35%)!important}
+.liquid-nav .liquid-lens:after{opacity:.18!important}
+.liquid-nav button{z-index:3!important}
+.liquid-nav .add-nav{z-index:4!important}
+
+/* Ensure dashboard content is visible immediately on first load. */
+.app-shell .content{position:relative;z-index:1;visibility:visible!important;opacity:1!important}
