@@ -89,7 +89,6 @@ function shell(){
       <button id="logout"><i>↪</i><span>Log out</span></button>
     </nav>
   </div>`;
-  document.querySelectorAll("[data-page]").forEach(b=>b.onclick=()=>{currentPage=b.dataset.page;renderPage()});
   document.getElementById("logout").onclick=()=>signOut(auth);
   document.getElementById("adminPanelBtn").onclick=()=>{ currentPage="admin"; renderPage(); };
   setupLiquidNavigation();
@@ -114,91 +113,69 @@ function setupLiquidNavigation(){
   const nav=document.getElementById("bottomNav"), lens=document.getElementById("liquidLens");
   if(!nav || !lens)return;
 
-  // Logout is intentionally excluded: it is an action, not a page.
   const pages=["home","history","add","download"];
   let dragging=false;
   let moved=false;
-  let startX=0,startY=0;
-  let startIndex=0;
+  let startX=0,startY=0,startIndex=0;
   let pointerId=null;
-  let suppressClick=false;
+  let ignoreClickUntil=0;
 
   const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
   const buttons=()=>pages.map(p=>nav.querySelector(`[data-page="${p}"]`)).filter(Boolean);
 
-  function updateLensTo(index,animate=true){
+  function placeLens(index,animate=true){
     const bs=buttons();
     if(!bs.length)return;
     index=clamp(index,0,bs.length-1);
-
     const b=bs[index];
-    const nr=nav.getBoundingClientRect();
-    const br=b.getBoundingClientRect();
-
+    const nr=nav.getBoundingClientRect(), br=b.getBoundingClientRect();
     lens.style.width=`${br.width}px`;
     lens.style.height=`${br.height}px`;
-    lens.style.borderRadius="22px";
+    lens.style.borderRadius="20px";
     lens.style.transition=animate
-      ?"transform .55s cubic-bezier(.16,1,.3,1),width .25s ease,height .25s ease,border-radius .25s ease"
-      :"none";
+      ? "transform .48s cubic-bezier(.16,1,.3,1),width .2s ease,height .2s ease,border-radius .2s ease"
+      : "none";
     lens.style.transform=`translate3d(${br.left-nr.left}px,${br.top-nr.top}px,0) scaleX(1) scaleY(1)`;
   }
 
   function paintLens(centerX,scaleX=1,scaleY=1){
     const bs=buttons();
     if(!bs.length)return;
-
     const nr=nav.getBoundingClientRect();
     const base=bs[startIndex];
     if(!base)return;
-
     const br=base.getBoundingClientRect();
     const baseWidth=br.width;
     const expanded=baseWidth*scaleX;
-
-    const rawLeft=centerX-(expanded/2);
-    const left=clamp(rawLeft,8,nr.width-expanded-8);
-
+    const maxLeft=Math.max(6,nr.width-expanded-6);
+    const left=clamp(centerX-nr.left-expanded/2,6,maxLeft);
     lens.style.width=`${baseWidth}px`;
     lens.style.height=`${br.height}px`;
-    lens.style.borderRadius=`${Math.max(18,22/scaleX)}px`;
+    lens.style.borderRadius=`${Math.max(16,20/scaleX)}px`;
     lens.style.transition="none";
     lens.style.transform=
       `translate3d(${left}px,${br.top-nr.top-(br.height*(scaleY-1)/2)}px,0) `+
       `scaleX(${scaleX}) scaleY(${scaleY})`;
   }
 
-  function lensCenter(){
-    const match=lens.style.transform.match(
-      /translate3d\(([-\d.]+)px,\s*[-\d.]+px,\s*0\)\s*scaleX\(([-\d.]+)\)\s*scaleY\(([-\d.]+)\)/
-    );
-    if(!match)return null;
-
-    const left=parseFloat(match[1]);
-    const scaleX=parseFloat(match[2])||1;
+  function currentLensCenter(){
+    const m=lens.style.transform.match(/translate3d\(([-\d.]+)px,\s*[-\d.]+px,\s*0\)\s*scaleX\(([-\d.]+)\)/);
+    if(!m)return null;
     const nr=nav.getBoundingClientRect();
-
-    return left+(lens.offsetWidth*scaleX/2)+nr.left;
+    const left=parseFloat(m[1]);
+    const sx=parseFloat(m[2])||1;
+    return nr.left+left+(lens.offsetWidth*sx)/2;
   }
 
   function nearestIndex(){
-    const bs=buttons();
-    const center=lensCenter();
+    const center=currentLensCenter();
     if(center===null)return startIndex;
-
-    let best=startIndex;
-    let distance=Infinity;
-
-    bs.forEach((b,i)=>{
+    let best=startIndex, distance=Infinity;
+    buttons().forEach((b,i)=>{
       const r=b.getBoundingClientRect();
-      const c=r.left+r.width/2;
-      const d=Math.abs(c-center);
-      if(d<distance){
-        distance=d;
-        best=i;
-      }
+      const d=Math.abs((r.left+r.width/2)-center);
+      if(d<distance){distance=d;best=i;}
     });
-
     return best;
   }
 
@@ -208,247 +185,83 @@ function setupLiquidNavigation(){
     renderPage();
   }
 
-  // NORMAL CLICK
-  // Pointer events are used only for swipe detection. A normal click
-  // is allowed to reach this handler and opens the selected page.
-  nav.querySelectorAll("[data-page]").forEach(button=>{
-    button.addEventListener("click",e=>{
-      if(suppressClick){
-        e.preventDefault();
-        e.stopPropagation();
-        suppressClick=false;
-        return;
-      }
-
-      const index=pages.indexOf(button.dataset.page);
-      if(index<0)return;
-
-      openPage(index);
-    });
+  // One and only one navigation click handler.
+  // Normal taps never depend on pointerup/pointercapture.
+  nav.addEventListener("click",e=>{
+    const button=e.target.closest?.("[data-page]");
+    if(!button)return;
+    if(performance.now()<ignoreClickUntil){
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+    const index=pages.indexOf(button.dataset.page);
+    if(index>=0)openPage(index);
   });
 
   nav.addEventListener("pointerdown",e=>{
     if(e.pointerType==="mouse" && e.button!==0)return;
-
-    const target=e.target.closest?.("[data-page]");
-    const index=target ? pages.indexOf(target.dataset.page) : -1;
-
+    const button=e.target.closest?.("[data-page]");
+    if(!button)return;
+    const index=pages.indexOf(button.dataset.page);
     if(index<0)return;
 
-    const button=nav.querySelector(`[data-page="${pages[index]}"]`);
-    if(!button)return;
-
     const r=button.getBoundingClientRect();
-
     dragging=true;
     moved=false;
-    suppressClick=false;
     pointerId=e.pointerId;
     startX=e.clientX;
     startY=e.clientY;
     startIndex=index;
-
     nav.classList.add("swiping","dragging");
-
-    try{nav.setPointerCapture(e.pointerId)}catch(_){}
-
-    paintLens(r.left+ r.width/2,1,1);
+    paintLens(r.left+r.width/2,1,1);
+    // No pointer capture: native click remains reliable.
   });
 
   nav.addEventListener("pointermove",e=>{
     if(!dragging || e.pointerId!==pointerId)return;
-
     const dx=e.clientX-startX;
     const dy=e.clientY-startY;
 
-    // Only become a swipe after a small horizontal movement.
-    if(Math.abs(dx)>7 && Math.abs(dx)>=Math.abs(dy)*0.65){
+    if(!moved){
+      if(Math.abs(dx)<8)return;
+      if(Math.abs(dx)<Math.abs(dy)*0.7)return;
       moved=true;
     }
 
-    if(!moved)return;
-
     e.preventDefault();
-
     const nr=nav.getBoundingClientRect();
     const base=nav.querySelector(`[data-page="${pages[startIndex]}"]`);
     if(!base)return;
-
     const br=base.getBoundingClientRect();
-
-    // The lens follows the pointer and becomes wider as it moves.
     const travel=Math.abs(dx);
-    const scaleX=1+Math.min(.62,(travel/Math.max(120,nr.width))*.90);
-    const scaleY=1+Math.min(.075,(travel/Math.max(120,nr.width))*.11);
-
+    const scaleX=1+Math.min(.55,(travel/Math.max(120,nr.width))*.82);
+    const scaleY=1+Math.min(.07,(travel/Math.max(120,nr.width))*.10);
     paintLens(br.left+br.width/2+dx,scaleX,scaleY);
   },{passive:false});
 
   function endDrag(e){
     if(!dragging || e.pointerId!==pointerId)return;
-
     const wasMoved=moved;
-
     dragging=false;
     nav.classList.remove("swiping","dragging");
 
     if(wasMoved){
-      // Prevent the browser's synthetic click after a swipe.
-      suppressClick=true;
       e.preventDefault();
-
-      const index=nearestIndex();
-      openPage(index);
-
-      setTimeout(()=>{
-        suppressClick=false;
-        updateLensTo(pages.indexOf(currentPage),true);
-      },80);
-    }else{
-      // It was a normal tap. Let the click handler do the navigation.
-      updateLensTo(pages.indexOf(currentPage),true);
+      ignoreClickUntil=performance.now()+300;
+      openPage(nearestIndex());
     }
 
     moved=false;
     pointerId=null;
+    requestAnimationFrame(()=>placeLens(pages.indexOf(currentPage),true));
   }
 
   nav.addEventListener("pointerup",endDrag);
   nav.addEventListener("pointercancel",endDrag);
-  nav.addEventListener("lostpointercapture",e=>{
-    if(dragging)endDrag(e);
-  });
-
-  window.addEventListener("resize",()=>{
-    requestAnimationFrame(()=>updateLensTo(pages.indexOf(currentPage),false));
-  });
-
-  requestAnimationFrame(()=>{
-    updateLensTo(pages.indexOf(currentPage),false);
-  });
+  window.addEventListener("resize",()=>requestAnimationFrame(()=>placeLens(pages.indexOf(currentPage),false)));
+  requestAnimationFrame(()=>placeLens(pages.indexOf(currentPage),false));
 }
-
-async function adminApi(action, payload={}){
-  const token=await currentUser.getIdToken();
-  const res=await fetch(`/api/admin?action=${encodeURIComponent(action)}`,{
-    method:"POST",headers:{"Content-Type":"application/json","Authorization":`Bearer ${token}`},
-    body:JSON.stringify(payload)
-  });
-  const data=await res.json().catch(()=>({error:"Invalid server response"}));
-  if(!res.ok)throw new Error(data.error||"Admin request failed");
-  return data;
-}
-
-async function checkAdminAccess(){
-  try{
-    const data=await adminApi("me");
-    const btn=document.getElementById("adminPanelBtn");
-    if(btn && data.isAdmin)btn.classList.remove("hidden");
-  }catch(_){}
-}
-
-async function renderAdmin(p){
-  p.innerHTML=`<div class="admin-shell">
-    <div class="admin-head">
-      <div><div class="eyebrow">ADMIN CONTROL</div><h2>Admin Panel</h2><p class="muted">Manage users and correct transactions securely.</p></div>
-      <button class="secondary" id="backHome">← Home</button>
-    </div>
-    <div class="admin-stats" id="adminStats"><div class="admin-stat glass"><b>Loading…</b><small>Users</small></div></div>
-    <section class="admin-card glass">
-      <div class="admin-toolbar"><h3>Users</h3><input id="userSearch" placeholder="Search name or email"></div>
-      <div id="adminUsers" class="admin-users"><div class="admin-loading">Loading users…</div></div>
-    </section>
-  </div>`;
-  document.getElementById("backHome").onclick=()=>{currentPage="home";renderPage()};
-  try{
-    const data=await adminApi("users");
-    document.getElementById("adminStats").innerHTML=`
-      <div class="admin-stat glass"><strong>${data.users.length}</strong><small>Total users</small></div>
-      <div class="admin-stat glass"><strong>${data.users.filter(u=>u.disabled).length}</strong><small>Disabled</small></div>
-      <div class="admin-stat glass"><strong>${data.users.filter(u=>u.locked).length}</strong><small>Temporarily locked</small></div>`;
-    const renderUsers=()=>{
-      const q=document.getElementById("userSearch").value.trim().toLowerCase();
-      const rows=data.users.filter(u=>(u.email+" "+(u.displayName||"")).toLowerCase().includes(q));
-      document.getElementById("adminUsers").innerHTML=rows.length?rows.map(u=>`
-        <article class="admin-user ${u.disabled?"is-disabled":""}">
-          <div class="admin-user-main"><div class="avatar">${esc((u.displayName||u.email||"?").slice(0,1).toUpperCase())}</div>
-            <div><b>${esc(u.displayName||"Unnamed user")}</b><span>${esc(u.email||"No email")}</span><small>${u.uid}</small></div></div>
-          <div class="user-money"><span class="pos">+ ${money(u.credit)}</span><span class="neg">− ${money(u.debit)}</span><strong>${money(u.balance)}</strong><small>${u.locked?"LOCKED":u.disabled?"DISABLED":"ACTIVE"}</small></div>
-          <button class="secondary manage-user" data-uid="${u.uid}">Manage</button>
-        </article>`).join(""):`<div class="admin-loading">No users found.</div>`;
-      document.querySelectorAll(".manage-user").forEach(b=>b.onclick=()=>openAdminUser(data.users.find(u=>u.uid===b.dataset.uid)));
-    };
-    document.getElementById("userSearch").oninput=renderUsers; renderUsers();
-  }catch(err){document.getElementById("adminUsers").innerHTML=`<div class="admin-error">${esc(err.message)}</div>`}
-}
-
-async function openAdminUser(u){
-  const p=document.getElementById("page");
-  p.innerHTML=`<div class="admin-shell">
-    <div class="admin-head"><div><div class="eyebrow">USER MANAGEMENT</div><h2>${esc(u.displayName||"User")}</h2><p class="muted">${esc(u.email||"")}</p></div><button class="secondary" id="backUsers">← Users</button></div>
-    <section class="user-overview glass">
-      <div class="overview-money"><span class="pos">Positive ${money(u.credit)}</span><span class="neg">Negative ${money(u.debit)}</span><strong>${money(u.balance)}</strong><small>Available balance</small></div>
-      <div class="status-pill ${u.disabled?"bad":u.locked?"warn":"ok"}">${u.disabled?"DISABLED":u.locked?"LOCKED":"ACTIVE"}</div>
-    </section>
-    <section class="admin-card glass">
-      <div class="admin-toolbar"><div><h3>Transactions</h3><span class="muted">Admin can remove incorrect entries</span></div><button class="secondary" id="adminDownloadReport">↓ Download Report</button></div>
-      <div id="adminTx" class="tx-list"><div class="admin-loading">Loading…</div></div>
-    </section>
-    <section class="admin-actions glass">
-      <h3>Account controls</h3>
-      <p class="muted">These actions affect only this user's account.</p>
-      <div class="action-grid">
-        <button class="secondary" id="toggleLock">${u.locked?"Unlock temporarily locked user":"Temporary lock"}</button>
-        <button class="secondary" id="toggleDisable">${u.disabled?"Enable account":"Disable account"}</button>
-        <button class="danger" id="deleteUser">Delete account</button>
-      </div>
-      <small class="admin-warning">Delete permanently removes the Firebase Auth account and the user's transaction records. Use only when necessary.</small>
-    </section>
-  </div>`;
-  document.getElementById("backUsers").onclick=()=>renderAdmin(document.getElementById("page"));
-
-  document.getElementById("toggleLock").onclick=async()=>{
-    try{await adminApi(u.locked?"unlockUser":"lockUser",{uid:u.uid});toast(u.locked?"User unlocked":"User temporarily locked","success");renderAdmin(document.getElementById("page"))}
-    catch(e){toast(e.message,"error")}
-  };
-  document.getElementById("toggleDisable").onclick=async()=>{
-    try{await adminApi(u.disabled?"enableUser":"disableUser",{uid:u.uid});toast(u.disabled?"Account enabled":"Account disabled","success");renderAdmin(document.getElementById("page"))}
-    catch(e){toast(e.message,"error")}
-  };
-  document.getElementById("deleteUser").onclick=async()=>{
-    if(!confirm(`Delete ${u.email||u.displayName||"this user"} permanently?`))return;
-    try{await adminApi("deleteUser",{uid:u.uid});toast("Account deleted","success");renderAdmin(document.getElementById("page"))}
-    catch(e){toast(e.message,"error")}
-  };
-
-  try{
-    const data=await adminApi("transactions",{uid:u.uid});
-    const adminTransactions=data.transactions||[];
-    document.getElementById("adminDownloadReport").onclick=()=>showAdminReportDialog(u,adminTransactions);
-    document.getElementById("adminTx").innerHTML=adminTransactions.length?adminTransactions.map(t=>`
-      <div class="tx admin-tx"><div class="tx-icon ${t.type}">${t.type==="credit"?"↗":"↘"}</div>
-        <div class="tx-main"><b>${esc(t.note)}</b><span>${esc(t.date)} · ${esc(t.id)}</span></div>
-        <strong class="${t.type}">${t.type==="credit"?"+":"−"}${money(t.amount)}</strong>
-        <button class="delete-tx" data-id="${t.id}" title="Delete transaction">✕</button>
-      </div>`).join(""):`<div class="admin-loading">No transactions.</div>`;
-    document.querySelectorAll(".delete-tx").forEach(b=>b.onclick=async()=>{
-      if(!confirm("Remove this transaction? The user's totals will update."))return;
-      let passcode;
-      if(u.uid===currentUser?.uid){
-        passcode=window.prompt("Admin self-delete requires passcode:");
-        if(passcode===null)return;
-      }
-      try{
-        const payload={uid:u.uid,transactionId:b.dataset.id};
-        if(passcode!==undefined)payload.passcode=passcode;
-        await adminApi("deleteTransaction",payload);
-        toast("Transaction removed","success");
-        openAdminUser(u);
-      }catch(e){toast(e.message,"error")}
-    });
-  }catch(e){document.getElementById("adminTx").innerHTML=`<div class="admin-error">${esc(e.message)}</div>`}
-}
-
 
 function showAdminReportDialog(user,txs){
   const old=document.getElementById("adminReportDialog");
@@ -563,7 +376,7 @@ function renderHome(p){
       <small>${balance>=0?"Today's remaining balance":"Watch today's spending"}</small>
     </div><div class="balance-arrow">${balance>=0?"↑":"↓"}</div>
   </article>
-  <div class="quote">✦<br><b>Discipline today,<br>financial freedom tomorrow.</b></div>`;
+`;
 }
 
 function renderHistory(p){
