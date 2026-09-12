@@ -360,14 +360,22 @@ function downloadAdminUserReport(user,txs,from,to){
 }
 
 function renderPage(){
-  const p=document.getElementById("page"); if(!p)return;
-  document.querySelectorAll("[data-page]").forEach(b=>b.classList.toggle("active",b.dataset.page===currentPage));
-  requestAnimationFrame(updateLiquidLens);
+  const p=document.getElementById("page");
+  if(!p)return;
+
+  document.querySelectorAll("[data-page]").forEach(b=>{
+    b.classList.toggle("active",b.dataset.page===currentPage);
+  });
+
   if(currentPage==="home")renderHome(p);
   if(currentPage==="history")renderHistory(p);
   if(currentPage==="add")renderAdd(p);
   if(currentPage==="download")renderDownload(p);
   if(currentPage==="admin")renderAdmin(p);
+
+  requestAnimationFrame(()=>{
+    updateLiquidLens();
+  });
 }
 
 function renderHome(p){
