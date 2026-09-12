@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
-import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updateProfile, getIdToken } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updateProfile, getIdToken, GoogleAuthProvider, signInWithPopup, RecaptchaVerifier, signInWithPhoneNumber, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
 import { getFirestore, doc, setDoc, collection, addDoc, query, orderBy, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
 import { firebaseConfig } from "./firebase-config.js";
 
@@ -19,37 +19,230 @@ function toast(msg,type="info"){
   document.body.appendChild(e); setTimeout(()=>e.remove(),2800);
 }
 
+let phoneConfirmationResult = null;
+let phoneRecaptchaVerifier = null;
+
+function clearPhoneRecaptcha(){
+  try{
+    if(phoneRecaptchaVerifier){
+      phoneRecaptchaVerifier.clear();
+      phoneRecaptchaVerifier=null;
+    }
+  }catch(_){}
+}
+
+function setupPhoneRecaptcha(){
+  clearPhoneRecaptcha();
+  const box=document.getElementById("recaptcha-container");
+  if(!box)return null;
+  phoneRecaptchaVerifier=new RecaptchaVerifier(auth,"recaptcha-container",{
+    size:"invisible",
+    callback:()=>{}
+  });
+  return phoneRecaptchaVerifier;
+}
+
+function normaliseIndianPhone(value){
+  const digits=String(value||"").replace(/\D/g,"");
+  if(digits.length===10)return "+91"+digits;
+  if(digits.length===12 && digits.startsWith("91"))return "+"+digits;
+  return "";
+}
+
 function authView(mode="login"){
   const register=mode==="register";
+  clearPhoneRecaptcha();
+  phoneConfirmationResult=null;
+
   root.innerHTML=`<main class="auth-shell">
     <div class="orb orb1"></div><div class="orb orb2"></div>
     <section class="auth-card glass">
       <div class="brand-mark">₹</div>
       <h1>MoneyFlow</h1><p>Track Today, Build Tomorrow</p>
+
+      <div class="auth-methods" id="authMethods">
+        <button class="auth-method active" type="button" data-auth-method="email">✉️ <span>Email</span></button>
+        <button class="auth-method" type="button" data-auth-method="phone">📱 <span>Mobile</span></button>
+      </div>
+
       <form id="authForm">
         ${register?'<input id="name" placeholder="Full name" required>':""}
-        <input id="email" type="email" placeholder="Email address" required>
-        <input id="password" type="password" placeholder="Password" minlength="6" required>
-        <button class="primary wide">${register?"Create account":"Login"}</button>
+        <div id="emailFields">
+          <input id="email" type="email" placeholder="Email address" required>
+          <input id="password" type="password" placeholder="Password" minlength="6" required>
+          <button class="primary wide" id="emailSubmit" type="submit">${register?"Create account":"Login"}</button>
+        </div>
+
+        <div id="phoneFields" class="hidden">
+          <input id="phone" type="tel" inputmode="numeric" autocomplete="tel" placeholder="Mobile number (10 digits)" maxlength="10">
+          <div id="recaptcha-container"></div>
+          <button class="primary wide" id="sendOtpBtn" type="button">Send OTP</button>
+
+          <div id="otpFields" class="hidden">
+            <input id="phoneOtp" type="text" inputmode="numeric" autocomplete="one-time-code" placeholder="Enter 6-digit OTP" maxlength="6">
+            <button class="primary wide" id="verifyOtpBtn" type="button">Verify & Login</button>
+            <button class="link-btn" id="changePhoneBtn" type="button">Change number</button>
+          </div>
+        </div>
       </form>
+
+      <div class="auth-divider"><span>OR</span></div>
+      <button class="secondary wide google-btn" id="googleLogin" type="button">G&nbsp;&nbsp;Continue with Google</button>
+
+      ${!register?'<button class="link-btn" id="forgotPassword" type="button">Forgot Password?</button>':""}
       <button class="link-btn" id="switch">${register?"Already have an account? Login":"New here? Create an account"}</button>
       <small>Your financial data is stored securely per account.</small>
     </section>
   </main>`;
+
+  const emailFields=document.getElementById("emailFields");
+  const phoneFields=document.getElementById("phoneFields");
+  const authMethods=document.querySelectorAll("[data-auth-method]");
+
+  const setMethod=(method)=>{
+    authMethods.forEach(b=>b.classList.toggle("active",b.dataset.authMethod===method));
+    emailFields.classList.toggle("hidden",method!=="email");
+    phoneFields.classList.toggle("hidden",method!=="phone");
+    const email=document.getElementById("email");
+    const password=document.getElementById("password");
+    if(email)email.required=method==="email";
+    if(password)password.required=method==="email";
+    if(method==="phone")setTimeout(setupPhoneRecaptcha,0);
+    else clearPhoneRecaptcha();
+  };
+
+  authMethods.forEach(b=>b.onclick=()=>setMethod(b.dataset.authMethod));
   document.getElementById("switch").onclick=()=>authView(register?"login":"register");
+
   document.getElementById("authForm").onsubmit=async e=>{
     e.preventDefault();
+    if(document.getElementById("emailFields").classList.contains("hidden"))return;
     try{
-      const email=document.getElementById("email").value.trim(), password=document.getElementById("password").value;
+      const email=document.getElementById("email").value.trim();
+      const password=document.getElementById("password").value;
       if(register){
         const name=document.getElementById("name").value.trim();
         const c=await createUserWithEmailAndPassword(auth,email,password);
         await updateProfile(c.user,{displayName:name});
         await setDoc(doc(db,"users",c.user.uid),{displayName:name,lockedUntil:null},{merge:true});
         toast("Account created","success");
-      }else await signInWithEmailAndPassword(auth,email,password);
-    }catch(err){toast(err.message.replace("Firebase: ",""),"error")}
+      }else{
+        await signInWithEmailAndPassword(auth,email,password);
+      }
+    }catch(err){
+      toast(err.message.replace("Firebase: ",""),"error");
+    }
   };
+
+  document.getElementById("googleLogin").onclick=async()=>{
+    try{
+      const provider=new GoogleAuthProvider();
+      const result=await signInWithPopup(auth,provider);
+      if(result?.user){
+        await setDoc(doc(db,"users",result.user.uid),{
+          displayName:result.user.displayName||"",
+          email:result.user.email||"",
+          lockedUntil:null
+        },{merge:true});
+      }
+      toast("Google login successful","success");
+    }catch(err){
+      if(err.code!=="auth/popup-closed-by-user")
+        toast(err.message.replace("Firebase: ",""),"error");
+    }
+  };
+
+  if(!register){
+    document.getElementById("forgotPassword").onclick=()=>{
+      const email=document.getElementById("email")?.value.trim()||"";
+      authView("forgot");
+      const input=document.getElementById("resetEmail");
+      if(input)input.value=email;
+    };
+  }
+
+  document.getElementById("sendOtpBtn").onclick=async()=>{
+    const phone=normaliseIndianPhone(document.getElementById("phone").value);
+    if(!phone)return toast("Enter a valid 10-digit Indian mobile number","error");
+
+    try{
+      const verifier=phoneRecaptchaVerifier||setupPhoneRecaptcha();
+      if(!verifier)return toast("Phone verification is not ready. Try again.","error");
+
+      const btn=document.getElementById("sendOtpBtn");
+      btn.disabled=true;
+      phoneConfirmationResult=await signInWithPhoneNumber(auth,phone,verifier);
+      document.getElementById("otpFields").classList.remove("hidden");
+      document.getElementById("phone").disabled=true;
+      btn.textContent="OTP Sent ✓";
+      toast("OTP sent to your mobile number","success");
+    }catch(err){
+      clearPhoneRecaptcha();
+      const msg=err.code==="auth/invalid-phone-number"
+        ?"Invalid mobile number"
+        :err.code==="auth/too-many-requests"
+        ?"Too many attempts. Please try again later."
+        :err.message.replace("Firebase: ","");
+      toast(msg,"error");
+      const btn=document.getElementById("sendOtpBtn");
+      if(btn){btn.disabled=false;btn.textContent="Send OTP";}
+      setTimeout(setupPhoneRecaptcha,0);
+    }
+  };
+
+  document.getElementById("verifyOtpBtn").onclick=async()=>{
+    const otp=document.getElementById("phoneOtp").value.trim();
+    if(!phoneConfirmationResult)return toast("Send OTP first","error");
+    if(!/^\d{6}$/.test(otp))return toast("Enter the 6-digit OTP","error");
+
+    try{
+      const result=await phoneConfirmationResult.confirm(otp);
+      const u=result.user;
+      await setDoc(doc(db,"users",u.uid),{
+        displayName:u.displayName||"",
+        phoneNumber:u.phoneNumber||"",
+        lockedUntil:null
+      },{merge:true});
+      toast("Mobile login successful","success");
+    }catch(err){
+      toast(err.message.replace("Firebase: ",""),"error");
+    }
+  };
+
+  document.getElementById("changePhoneBtn").onclick=()=>{
+    phoneConfirmationResult=null;
+    authView(register?"register":"login");
+    setTimeout(()=>document.querySelector('[data-auth-method="phone"]')?.click(),0);
+  };
+
+  if(mode==="forgot"){
+    root.innerHTML=`<main class="auth-shell">
+      <div class="orb orb1"></div><div class="orb orb2"></div>
+      <section class="auth-card glass">
+        <div class="brand-mark">₹</div>
+        <h1>Reset Password</h1>
+        <p>We'll send a secure password reset link to your email.</p>
+        <form id="resetForm">
+          <input id="resetEmail" type="email" placeholder="Email address" required>
+          <button class="primary wide" type="submit">Send Reset Email</button>
+        </form>
+        <button class="link-btn" id="backToLogin" type="button">← Back to Login</button>
+        <small>Open the email and follow the secure Firebase reset link to create your new password.</small>
+      </section>
+    </main>`;
+
+    document.getElementById("backToLogin").onclick=()=>authView("login");
+    document.getElementById("resetForm").onsubmit=async e=>{
+      e.preventDefault();
+      const email=document.getElementById("resetEmail").value.trim();
+      try{
+        await sendPasswordResetEmail(auth,email);
+        toast("Password reset email sent. Check your inbox.","success");
+      }catch(err){
+        toast(err.message.replace("Firebase: ",""),"error");
+      }
+    };
+  }
 }
 
 function totals(rows=transactions){
