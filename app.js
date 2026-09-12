@@ -113,89 +113,220 @@ function updateLiquidLens(){
 function setupLiquidNavigation(){
   const nav=document.getElementById("bottomNav"), lens=document.getElementById("liquidLens");
   if(!nav || !lens)return;
+
+  // Logout is intentionally excluded: it is an action, not a page.
   const pages=["home","history","add","download"];
-  let dragging=false,moved=false,startX=0,startY=0,startIndex=0,pointerId=null,tapHandled=false;
+  let dragging=false;
+  let moved=false;
+  let startX=0,startY=0;
+  let startIndex=0;
+  let pointerId=null;
+  let suppressClick=false;
+
   const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
   const buttons=()=>pages.map(p=>nav.querySelector(`[data-page="${p}"]`)).filter(Boolean);
 
-  function paintLens(x,sx=1,sy=1){
-    const bs=buttons(); if(!bs.length)return;
-    const nr=nav.getBoundingClientRect(),base=bs[startIndex]; if(!base)return;
-    const ar=base.getBoundingClientRect();
-    const width=ar.width, expanded=width*sx;
-    const maxX=Math.max(8,nr.width-expanded-8);
-    const target=clamp(x-(expanded-width)/2,8,maxX);
-    lens.style.width=`${width}px`; lens.style.height=`${ar.height}px`;
-    lens.style.transform=`translate3d(${target}px,${ar.top-nr.top-(ar.height*(sy-1)/2)}px,0) scaleX(${sx}) scaleY(${sy})`;
-    lens.style.borderRadius=`${Math.max(18,22/sx)}px`;
-    lens.style.transition="none";
+  function updateLensTo(index,animate=true){
+    const bs=buttons();
+    if(!bs.length)return;
+    index=clamp(index,0,bs.length-1);
+
+    const b=bs[index];
+    const nr=nav.getBoundingClientRect();
+    const br=b.getBoundingClientRect();
+
+    lens.style.width=`${br.width}px`;
+    lens.style.height=`${br.height}px`;
+    lens.style.borderRadius="22px";
+    lens.style.transition=animate
+      ?"transform .55s cubic-bezier(.16,1,.3,1),width .25s ease,height .25s ease,border-radius .25s ease"
+      :"none";
+    lens.style.transform=`translate3d(${br.left-nr.left}px,${br.top-nr.top}px,0) scaleX(1) scaleY(1)`;
   }
 
-  function nearestIndexFromLens(){
-    const bs=buttons(),nr=nav.getBoundingClientRect();
-    const m=lens.style.transform.match(/translate3d\(([-\d.]+)px/);
-    const mx=lens.style.transform.match(/scaleX\(([-\d.]+)\)/);
-    const sx=mx?parseFloat(mx[1]):1;
-    const left=m?parseFloat(m[1]):0;
-    const center=left+(lens.offsetWidth*sx)/2;
-    let best=0,dist=Infinity;
-    bs.forEach((b,i)=>{const r=b.getBoundingClientRect(),c=r.left-nr.left+r.width/2,d=Math.abs(c-center);if(d<dist){dist=d;best=i;}});
+  function paintLens(centerX,scaleX=1,scaleY=1){
+    const bs=buttons();
+    if(!bs.length)return;
+
+    const nr=nav.getBoundingClientRect();
+    const base=bs[startIndex];
+    if(!base)return;
+
+    const br=base.getBoundingClientRect();
+    const baseWidth=br.width;
+    const expanded=baseWidth*scaleX;
+
+    const rawLeft=centerX-(expanded/2);
+    const left=clamp(rawLeft,8,nr.width-expanded-8);
+
+    lens.style.width=`${baseWidth}px`;
+    lens.style.height=`${br.height}px`;
+    lens.style.borderRadius=`${Math.max(18,22/scaleX)}px`;
+    lens.style.transition="none";
+    lens.style.transform=
+      `translate3d(${left}px,${br.top-nr.top-(br.height*(scaleY-1)/2)}px,0) `+
+      `scaleX(${scaleX}) scaleY(${scaleY})`;
+  }
+
+  function lensCenter(){
+    const match=lens.style.transform.match(
+      /translate3d\(([-\d.]+)px,\s*[-\d.]+px,\s*0\)\s*scaleX\(([-\d.]+)\)\s*scaleY\(([-\d.]+)\)/
+    );
+    if(!match)return null;
+
+    const left=parseFloat(match[1]);
+    const scaleX=parseFloat(match[2])||1;
+    const nr=nav.getBoundingClientRect();
+
+    return left+(lens.offsetWidth*scaleX/2)+nr.left;
+  }
+
+  function nearestIndex(){
+    const bs=buttons();
+    const center=lensCenter();
+    if(center===null)return startIndex;
+
+    let best=startIndex;
+    let distance=Infinity;
+
+    bs.forEach((b,i)=>{
+      const r=b.getBoundingClientRect();
+      const c=r.left+r.width/2;
+      const d=Math.abs(c-center);
+      if(d<distance){
+        distance=d;
+        best=i;
+      }
+    });
+
     return best;
   }
 
-  function snapTo(index){currentPage=pages[clamp(index,0,pages.length-1)];renderPage();}
+  function openPage(index){
+    const page=pages[clamp(index,0,pages.length-1)];
+    currentPage=page;
+    renderPage();
+  }
 
-  nav.querySelectorAll("[data-page]").forEach(b=>b.addEventListener("click",e=>{
-    if(tapHandled){tapHandled=false;return;}
-    if(moved){e.preventDefault();return;}
-    const i=pages.indexOf(b.dataset.page); if(i>=0)snapTo(i);
-  }));
+  // NORMAL CLICK
+  // Pointer events are used only for swipe detection. A normal click
+  // is allowed to reach this handler and opens the selected page.
+  nav.querySelectorAll("[data-page]").forEach(button=>{
+    button.addEventListener("click",e=>{
+      if(suppressClick){
+        e.preventDefault();
+        e.stopPropagation();
+        suppressClick=false;
+        return;
+      }
+
+      const index=pages.indexOf(button.dataset.page);
+      if(index<0)return;
+
+      openPage(index);
+    });
+  });
 
   nav.addEventListener("pointerdown",e=>{
-    if(e.pointerType==="mouse"&&e.button!==0)return;
+    if(e.pointerType==="mouse" && e.button!==0)return;
+
     const target=e.target.closest?.("[data-page]");
-    const i=target?pages.indexOf(target.dataset.page):pages.indexOf(currentPage);
-    if(i<0)return;
-    const active=nav.querySelector(`[data-page="${pages[i]}"]`); if(!active)return;
-    const nr=nav.getBoundingClientRect(),ar=active.getBoundingClientRect();
-    dragging=true;moved=false;pointerId=e.pointerId;startX=e.clientX;startY=e.clientY;startIndex=i;
+    const index=target ? pages.indexOf(target.dataset.page) : -1;
+
+    if(index<0)return;
+
+    const button=nav.querySelector(`[data-page="${pages[index]}"]`);
+    if(!button)return;
+
+    const r=button.getBoundingClientRect();
+
+    dragging=true;
+    moved=false;
+    suppressClick=false;
+    pointerId=e.pointerId;
+    startX=e.clientX;
+    startY=e.clientY;
+    startIndex=index;
+
     nav.classList.add("swiping","dragging");
-    try{nav.setPointerCapture(e.pointerId)}catch(_){ }
-    paintLens(ar.left-nr.left,1,1);
+
+    try{nav.setPointerCapture(e.pointerId)}catch(_){}
+
+    paintLens(r.left+ r.width/2,1,1);
   });
 
   nav.addEventListener("pointermove",e=>{
-    if(!dragging||e.pointerId!==pointerId)return;
-    const dx=e.clientX-startX,dy=e.clientY-startY;
-    if(Math.abs(dx)>8)moved=true;
-    if(!moved&&Math.abs(dx)<Math.abs(dy)*0.65)return;
+    if(!dragging || e.pointerId!==pointerId)return;
+
+    const dx=e.clientX-startX;
+    const dy=e.clientY-startY;
+
+    // Only become a swipe after a small horizontal movement.
+    if(Math.abs(dx)>7 && Math.abs(dx)>=Math.abs(dy)*0.65){
+      moved=true;
+    }
+
+    if(!moved)return;
+
     e.preventDefault();
-    const nr=nav.getBoundingClientRect(),active=nav.querySelector(`[data-page="${pages[startIndex]}"]`);if(!active)return;
-    const ar=active.getBoundingClientRect();
-    const amount=Math.abs(dx)/Math.max(140,nr.width);
-    const sx=1+Math.min(.70,amount*.85);
-    const sy=1+Math.min(.08,amount*.12);
-    paintLens((ar.left-nr.left)+dx,sx,sy);
+
+    const nr=nav.getBoundingClientRect();
+    const base=nav.querySelector(`[data-page="${pages[startIndex]}"]`);
+    if(!base)return;
+
+    const br=base.getBoundingClientRect();
+
+    // The lens follows the pointer and becomes wider as it moves.
+    const travel=Math.abs(dx);
+    const scaleX=1+Math.min(.62,(travel/Math.max(120,nr.width))*.90);
+    const scaleY=1+Math.min(.075,(travel/Math.max(120,nr.width))*.11);
+
+    paintLens(br.left+br.width/2+dx,scaleX,scaleY);
   },{passive:false});
 
   function endDrag(e){
-    if(!dragging||e.pointerId!==pointerId)return;
+    if(!dragging || e.pointerId!==pointerId)return;
+
     const wasMoved=moved;
-    const target=e.target.closest?.("[data-page]");
-    const targetIndex=target?pages.indexOf(target.dataset.page):-1;
-    dragging=false;nav.classList.remove("swiping","dragging");
-    if(wasMoved){e.preventDefault();snapTo(nearestIndexFromLens());}
-    else if(targetIndex>=0){tapHandled=true;snapTo(targetIndex);setTimeout(()=>tapHandled=false,80);}
-    else updateLiquidLens();
-    moved=false;pointerId=null;
+
+    dragging=false;
+    nav.classList.remove("swiping","dragging");
+
+    if(wasMoved){
+      // Prevent the browser's synthetic click after a swipe.
+      suppressClick=true;
+      e.preventDefault();
+
+      const index=nearestIndex();
+      openPage(index);
+
+      setTimeout(()=>{
+        suppressClick=false;
+        updateLensTo(pages.indexOf(currentPage),true);
+      },80);
+    }else{
+      // It was a normal tap. Let the click handler do the navigation.
+      updateLensTo(pages.indexOf(currentPage),true);
+    }
+
+    moved=false;
+    pointerId=null;
   }
+
   nav.addEventListener("pointerup",endDrag);
   nav.addEventListener("pointercancel",endDrag);
-  nav.addEventListener("lostpointercapture",e=>{if(dragging)endDrag(e)});
-  window.addEventListener("resize",updateLiquidLens);
-  updateLiquidLens();
-}
+  nav.addEventListener("lostpointercapture",e=>{
+    if(dragging)endDrag(e);
+  });
 
+  window.addEventListener("resize",()=>{
+    requestAnimationFrame(()=>updateLensTo(pages.indexOf(currentPage),false));
+  });
+
+  requestAnimationFrame(()=>{
+    updateLensTo(pages.indexOf(currentPage),false);
+  });
+}
 
 async function adminApi(action, payload={}){
   const token=await currentUser.getIdToken();
