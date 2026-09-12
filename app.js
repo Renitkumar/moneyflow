@@ -7,7 +7,7 @@ const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const root = document.getElementById("app");
-let currentUser = null, transactions = [], unsubscribe = null, currentPage = "home", dailyTimer = null, downloadView = "choose";
+let currentUser = null, transactions = [], unsubscribe = null, currentPage = "home", dailyTimer = null;
 
 const money = n => `₹${Number(n || 0).toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2})}`;
 const esc = s => String(s ?? "").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
@@ -540,178 +540,133 @@ function dailyRows(f,t){
   return dates;
 }
 
+let downloadMode = "choose";
+
 function renderDownload(p){
-  if(downloadView==="range"){
+  if(downloadMode === "range"){
     renderDownloadRange(p);
     return;
   }
 
   const today=todayKey();
-  const todayRows=dailyRows(today,today);
-  const todayTx=range(today,today);
-  const {credit,debit}=totals(todayTx);
-  const balance=credit-debit;
-
-  p.innerHTML=`
+  p.innerHTML=`<section class="download-page">
     <div class="download-hero">
-      <button class="download-back hidden" id="downloadBack">←</button>
-      <div class="download-icon-wrap">↓</div>
+      <div class="download-icon">↓</div>
       <div class="eyebrow">EXPORT</div>
       <h2>Download Data</h2>
-      <p>Get your transaction records in a clean and organized file.</p>
+      <p>Choose how you want to download your transaction report.</p>
     </div>
 
-    <section class="download-options">
-      <button class="download-option active" id="downloadTodayOption" type="button">
-        <span class="download-option-icon">▣</span>
+    <section class="download-options glass">
+      <button class="download-option selected" id="downloadTodayOption" type="button">
+        <span class="download-option-icon">◷</span>
         <span class="download-option-copy"><b>Today</b><small>Download today's transactions</small></span>
         <span class="download-option-arrow">›</span>
       </button>
       <button class="download-option" id="downloadRangeOption" type="button">
-        <span class="download-option-icon">▦</span>
+        <span class="download-option-icon">▣</span>
         <span class="download-option-copy"><b>To – From</b><small>Select a custom date range</small></span>
         <span class="download-option-arrow">›</span>
       </button>
     </section>
 
-    <section class="download-preview glass" id="downloadTodayPreview">
-      <div class="download-preview-head"><span>Today's report</span><b>${dateText(today)}</b></div>
-      <div class="download-mini-stats">
-        <div><small>Positive</small><strong class="positive-text">+${money(credit)}</strong></div>
-        <div><small>Negative</small><strong class="negative-text">−${money(debit)}</strong></div>
-        <div><small>Remaining</small><strong>${money(balance)}</strong></div>
-      </div>
-      <small class="download-count">${todayTx.length} transaction${todayTx.length===1?"":"s"} today</small>
-    </section>
+    <button class="primary wide download-main-btn" id="downloadToday">↓&nbsp; Download</button>
+    <p class="download-help">Today's report contains only transactions recorded today.</p>
+  </section>`;
 
-    <button class="primary wide download-main-btn" id="downloadToday">↓ &nbsp; Download</button>
-  `;
-
-  const todayBtn=document.getElementById("downloadToday");
-  const rangeBtn=document.getElementById("downloadRangeOption");
-  const todayOption=document.getElementById("downloadTodayOption");
-
-  todayOption.onclick=()=>{
-    todayOption.classList.add("active");
-    rangeBtn.classList.remove("active");
-    document.getElementById("downloadTodayPreview").classList.remove("hidden");
-    todayBtn.disabled=false;
-  };
-
-  rangeBtn.onclick=()=>{
-    downloadView="range";
+  document.getElementById("downloadRangeOption").onclick=()=>{
+    downloadMode="range";
     renderPage();
   };
 
-  todayBtn.onclick=()=>downloadCsv(today,today,"today");
+  document.getElementById("downloadToday").onclick=()=>{
+    const rows=range(today,today);
+    if(!rows.length)return toast("No transactions for today","error");
+    downloadCsvReport(today,today,rows,"Today");
+  };
 }
 
 function renderDownloadRange(p){
   const today=todayKey();
-  const first=transactions.length
-    ? iso(new Date(Math.min(...transactions.map(x=>new Date(x.date).getTime()))))
-    : today;
-
-  p.innerHTML=`
-    <div class="download-range-head">
-      <button class="download-back" id="downloadBack">←</button>
-      <div>
-        <div class="eyebrow">EXPORT · DATE RANGE</div>
-        <h2>Select Date Range</h2>
-        <p class="muted">Choose the start and end date for your transactions.</p>
-      </div>
+  p.innerHTML=`<section class="download-page download-range-page">
+    <button class="download-back" id="downloadBack" type="button">←</button>
+    <div class="download-hero">
+      <div class="download-icon">▣</div>
+      <div class="eyebrow">DATE RANGE</div>
+      <h2>Select Date Range</h2>
+      <p>Choose the start and end date for your transactions.</p>
     </div>
 
     <section class="download-date-card glass">
-      <label>From Date
-        <input id="downloadFrom" type="date" value="${first}">
-      </label>
-      <label>To Date
-        <input id="downloadTo" type="date" value="${today}">
-      </label>
-      <div class="download-range-note">▣ <span>You can select any date range to download your transactions.</span></div>
-      <div id="downloadRangePreview"></div>
+      <label>From Date<input id="downloadFrom" type="date"></label>
+      <label>To Date<input id="downloadTo" type="date" value="${today}"></label>
+      <div class="download-range-note"><span>i</span><div>Choose any date range to download the transactions recorded in that period.</div></div>
+      <div id="downloadRangePreview" class="download-range-preview"></div>
     </section>
 
-    <button class="primary wide download-main-btn" id="downloadRange">↓ &nbsp; Download</button>
-  `;
+    <button class="primary wide download-main-btn" id="downloadRange">↓&nbsp; Download</button>
+  </section>`;
 
-  const back=document.getElementById("downloadBack");
-  const from=document.getElementById("downloadFrom");
-  const to=document.getElementById("downloadTo");
-  const preview=document.getElementById("downloadRangePreview");
+  const f=document.getElementById("downloadFrom");
+  const t=document.getElementById("downloadTo");
+  const first=transactions.length?iso(new Date(Math.min(...transactions.map(x=>new Date(x.date).getTime())))):today;
+  f.value=first;
 
-  back.onclick=()=>{
-    downloadView="choose";
+  const preview=()=>{
+    const valid=f.value&&t.value&&f.value<=t.value;
+    const rows=valid?dailyRows(f.value,t.value):[];
+    const selected=valid?range(f.value,t.value):[];
+    const {credit,debit}=totals(selected);
+    document.getElementById("downloadRangePreview").innerHTML=valid
+      ? `<div><span>Selected range</span><b>${dateText(f.value)} – ${dateText(t.value)}</b></div><div><span>Transactions</span><b>${selected.length}</b></div><div><span>Remaining</span><b>${money(credit-debit)}</b></div>`
+      : `<div class="invalid">Please select a valid From and To date.</div>`;
+  };
+
+  f.onchange=t.onchange=preview;
+  preview();
+
+  document.getElementById("downloadBack").onclick=()=>{
+    downloadMode="choose";
     renderPage();
   };
 
-  const updatePreview=()=>{
-    const f=from.value, t=to.value;
-    const rows=dailyRows(f,t);
-    const tx=range(f,t);
-    const {credit,debit}=totals(tx);
-    const balance=credit-debit;
-    const valid=!!f&&!!t&&f<=t;
-    preview.innerHTML=valid ? `
-      <div class="download-selected-range"><span>Selected range</span><b>${dateText(f)} – ${dateText(t)}</b></div>
-      <div class="download-mini-stats">
-        <div><small>Positive</small><strong class="positive-text">+${money(credit)}</strong></div>
-        <div><small>Negative</small><strong class="negative-text">−${money(debit)}</strong></div>
-        <div><small>Remaining</small><strong>${money(balance)}</strong></div>
-      </div>
-      <small class="download-count">${tx.length} transaction${tx.length===1?"":"s"} in selected range · ${rows.length} day${rows.length===1?"":"s"}</small>
-    ` : `<div class="download-invalid">Please select a valid date range.</div>`;
-  };
-
-  from.onchange=to.onchange=updatePreview;
-  updatePreview();
-
   document.getElementById("downloadRange").onclick=()=>{
-    if(!from.value||!to.value||from.value>to.value){
-      toast("Please select a valid date range","error");
-      return;
-    }
-    downloadCsv(from.value,to.value,"range");
+    if(!f.value||!t.value||f.value>t.value)return toast("Please select a valid date range","error");
+    const rows=range(f.value,t.value);
+    if(!rows.length)return toast("No transactions in this range","error");
+    downloadCsvReport(f.value,t.value,rows,"Date Range");
   };
 }
 
-function downloadCsv(from,to,mode="range"){
-  const rows=dailyRows(from,to);
-  const r=range(from,to);
-  if(!r.length){
-    toast(mode==="today"?"No transactions today":"No transactions in this range","error");
-    return;
-  }
-
-  const totalC=rows.reduce((a,x)=>a+x.credit,0);
-  const totalD=rows.reduce((a,x)=>a+x.debit,0);
+function downloadCsvReport(fromDate,toDate,rows,label){
+  const daily=dailyRows(fromDate,toDate);
+  const {credit,debit}=totals(rows);
   const generated=new Date().toLocaleString("en-IN");
   const csv=[
-    ["MONEYFLOW DAILY REPORT"],
-    ["From",from,"To",to],
+    ["MONEYFLOW TRANSACTION REPORT"],
+    ["Report",label],
+    ["From",fromDate,"To",toDate],
     ["Generated",generated],
     [],
     ["Date","Positive (₹)","Negative (₹)","Remaining (₹)"],
-    ...rows.map(x=>[x.date,x.credit.toFixed(2),x.debit.toFixed(2),x.balance.toFixed(2)]),
+    ...daily.map(x=>[x.date,x.credit.toFixed(2),x.debit.toFixed(2),x.balance.toFixed(2)]),
     [],
-    ["TOTAL",totalC.toFixed(2),totalD.toFixed(2),(totalC-totalD).toFixed(2)],
+    ["TOTAL",credit.toFixed(2),debit.toFixed(2),(credit-debit).toFixed(2)],
     [],
     ["TRANSACTION DETAILS"],
     ["Date","Type","Description","Amount (₹)"],
-    ...r.map(x=>[x.date,x.type==="credit"?"Positive":"Negative",x.note,Number(x.amount).toFixed(2)])
+    ...rows.map(x=>[x.date,x.type==="credit"?"Positive":"Negative",x.note,Number(x.amount).toFixed(2)])
   ].map(row=>row.map(v=>`"${String(v??"").replace(/"/g,'""')}"`).join(",")).join("\n");
 
   const a=document.createElement("a");
   a.href=URL.createObjectURL(new Blob(["\ufeff"+csv],{type:"text/csv;charset=utf-8"}));
-  a.download=mode==="today"
-    ? `moneyflow_today_${from}.csv`
-    : `moneyflow_${from}_to_${to}.csv`;
+  a.download=fromDate===toDate
+    ? `moneyflow_${fromDate}.csv`
+    : `moneyflow_${fromDate}_to_${toDate}.csv`;
   a.click();
   setTimeout(()=>URL.revokeObjectURL(a.href),1000);
   toast("Report downloaded successfully","success");
 }
-
 function range(f,t){return transactions.filter(x=>x.date>=f&&x.date<=t).sort((a,b)=>b.date.localeCompare(a.date))}
 
 onAuthStateChanged(auth,user=>{
