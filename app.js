@@ -248,7 +248,20 @@ function shell(){
     <header class="topbar glass">
       <div class="brand"><span>₹</span><div><b>MoneyFlow</b><small>Track Today, Build Tomorrow</small></div></div>
       <div class="header-actions">
-        <button id="adminPanelBtn" class="admin-panel-btn hidden">⚙ Admin Panel</button>
+     <div class="header-actions">
+  <button id="userChip" class="user-chip" type="button" aria-haspopup="true" aria-expanded="false">
+    <span class="user-chip-avatar">
+      ${esc((currentUser?.displayName || currentUser?.email || "U").slice(0,1).toUpperCase())}
+    </span>
+    <span class="user-chip-chevron">⌄</span>
+  </button>
+
+  ${android ? `<div class="profile-menu hidden" id="profileMenu">
+    <button type="button" id="changeWalletPasscode">🔐 <span>Change Wallet Passcode</span></button>
+    <button type="button" id="forgotWalletPasscode">✉ <span>Forgot Passcode</span></button>
+    <button type="button" id="profileLogout">↪ <span>Log out</span></button>
+  </div>` : ""}
+</div>
        <button id="userChip" class="user-chip" type="button" aria-haspopup="true" aria-expanded="false">
   <span class="user-chip-avatar">
     ${esc((currentUser?.displayName || currentUser?.email || "U").slice(0,1).toUpperCase())}
