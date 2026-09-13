@@ -244,78 +244,158 @@ function handleWalletResetLink(){
 
 function shell(){
   const android=isAndroidApp();
+
   root.innerHTML=`<div class="app-shell">
     <header class="topbar glass">
-      <div class="brand"><span>₹</span><div><b>MoneyFlow</b><small>Track Today, Build Tomorrow</small></div></div>
-      <div class="header-actions">
-     <div class="header-actions">
-  <button id="userChip" class="user-chip" type="button" aria-haspopup="true" aria-expanded="false">
-    <span class="user-chip-avatar">
-      ${esc((currentUser?.displayName || currentUser?.email || "U").slice(0,1).toUpperCase())}
-    </span>
-    <span class="user-chip-chevron">⌄</span>
-  </button>
+      <div class="brand">
+        <span>₹</span>
+        <div>
+          <b>MoneyFlow</b>
+          <small>Track Today, Build Tomorrow</small>
+        </div>
+      </div>
 
-  ${android ? `<div class="profile-menu hidden" id="profileMenu">
-    <button type="button" id="changeWalletPasscode">🔐 <span>Change Wallet Passcode</span></button>
-    <button type="button" id="forgotWalletPasscode">✉ <span>Forgot Passcode</span></button>
-    <button type="button" id="profileLogout">↪ <span>Log out</span></button>
-  </div>` : ""}
-</div>
-       <button id="userChip" class="user-chip" type="button" aria-haspopup="true" aria-expanded="false">
-  <span class="user-chip-avatar">
-    ${esc((currentUser?.displayName || currentUser?.email || "U").slice(0,1).toUpperCase())}
-  </span>
-  <span class="user-chip-chevron">⌄</span>
-</button>
-        ${android?`<div class="profile-menu hidden" id="profileMenu">
-          <button type="button" id="changeWalletPasscode">🔐 <span>Change Wallet Passcode</span></button>
-          <button type="button" id="forgotWalletPasscode">✉ <span>Forgot Passcode</span></button>
-          <button type="button" id="profileLogout">↪ <span>Log out</span></button>
-        </div>`:""}
+      <div class="header-actions">
+        <button id="userChip" class="user-chip" type="button"
+          aria-haspopup="true" aria-expanded="false">
+          <span class="user-chip-avatar">
+            ${esc((currentUser?.displayName || currentUser?.email || "U")
+              .slice(0,1).toUpperCase())}
+          </span>
+          <span class="user-chip-chevron">⌄</span>
+        </button>
+
+        ${android ? `<div class="profile-menu hidden" id="profileMenu">
+          <button type="button" id="changeWalletPasscode">
+            🔐 <span>Change Wallet Passcode</span>
+          </button>
+          <button type="button" id="forgotWalletPasscode">
+            ✉ <span>Forgot Passcode</span>
+          </button>
+          <button type="button" id="profileLogout">
+            ↪ <span>Log out</span>
+          </button>
+        </div>` : ""}
       </div>
     </header>
-    <main class="content"><section id="page"></section></main>
+
+    <main class="content">
+      <section id="page"></section>
+    </main>
+
     <nav class="bottom-nav liquid-nav glass" id="bottomNav">
       <div class="liquid-lens" id="liquidLens" aria-hidden="true"></div>
-      <button data-page="home"><i>⌂</i><span>Home</span></button>
-      <button data-page="history"><i>◷</i><span>History</span></button>
-      <button data-page="add" class="add-nav"><i>＋</i><span>Add</span></button>
-      <button data-page="download"><i>↓</i><span>Download</span></button>
-      ${android?`<button data-page="money"><i>₹</i><span>Money</span></button>`:`<button id="logout"><i>↪</i><span>Log out</span></button>`}
+
+      <button data-page="home">
+        <i>⌂</i><span>Home</span>
+      </button>
+
+      <button data-page="history">
+        <i>◷</i><span>History</span>
+      </button>
+
+      <button data-page="add" class="add-nav">
+        <i>＋</i><span>Add</span>
+      </button>
+
+      <button data-page="download">
+        <i>↓</i><span>Download</span>
+      </button>
+
+      ${android
+        ? `<button data-page="money">
+            <i>₹</i><span>Money</span>
+          </button>`
+        : `<button id="logout">
+            <i>↪</i><span>Log out</span>
+          </button>`
+      }
     </nav>
   </div>`;
 
-  document.querySelectorAll("[data-page]").forEach(b=>b.onclick=()=>{const page=b.dataset.page;if(page==="money"&&isAndroidApp()){openWalletGate();return;}currentPage=page;renderPage()});
+  document.querySelectorAll("[data-page]").forEach(b=>{
+    b.onclick=()=>{
+      const page=b.dataset.page;
+
+      if(page==="money" && isAndroidApp()){
+        openWalletGate();
+        return;
+      }
+
+      currentPage=page;
+      renderPage();
+    };
+  });
 
   const logout=async()=>{
     const confirmed=await confirmLogout();
     if(!confirmed)return;
-    try{ await signOut(auth); }catch(err){ toast(err.message.replace("Firebase: ",""),"error"); }
+
+    try{
+      await signOut(auth);
+    }catch(err){
+      toast(err.message.replace("Firebase: ",""),"error");
+    }
   };
 
   const logoutButton=document.getElementById("logout");
-  if(logoutButton)logoutButton.onclick=async e=>{e.preventDefault();e.stopPropagation();await logout()};
 
-  if(android){
-    const chip=document.getElementById("userChip"), menu=document.getElementById("profileMenu");
-    chip.onclick=e=>{
+  if(logoutButton){
+    logoutButton.onclick=async e=>{
+      e.preventDefault();
       e.stopPropagation();
-      const open=menu.classList.toggle("hidden");
-      chip.setAttribute("aria-expanded",String(!open));
+      await logout();
     };
-    document.getElementById("changeWalletPasscode")?.addEventListener("click",()=>openWalletPasscode());
-    document.getElementById("forgotWalletPasscode")?.addEventListener("click",()=>sendWalletPasscodeReset());
-    document.getElementById("profileLogout")?.addEventListener("click",logout);
-    document.addEventListener("click",e=>{if(menu && !menu.contains(e.target) && e.target!==chip){menu.classList.add("hidden");chip.setAttribute("aria-expanded","false")}});
   }
 
-  document.getElementById("adminPanelBtn").onclick=()=>{ currentPage="admin"; renderPage(); };
+  if(android){
+    const chip=document.getElementById("userChip");
+    const menu=document.getElementById("profileMenu");
+
+    if(chip && menu){
+      chip.onclick=e=>{
+        e.stopPropagation();
+
+        const open=menu.classList.toggle("hidden");
+
+        chip.setAttribute(
+          "aria-expanded",
+          String(!open)
+        );
+      };
+
+      document.getElementById("changeWalletPasscode")
+        ?.addEventListener("click",()=>{
+          menu.classList.add("hidden");
+          openWalletPasscode();
+        });
+
+      document.getElementById("forgotWalletPasscode")
+        ?.addEventListener("click",()=>{
+          menu.classList.add("hidden");
+          sendWalletPasscodeReset();
+        });
+
+      document.getElementById("profileLogout")
+        ?.addEventListener("click",logout);
+
+      document.addEventListener("click",e=>{
+        if(
+          menu &&
+          !menu.contains(e.target) &&
+          e.target!==chip
+        ){
+          menu.classList.add("hidden");
+          chip.setAttribute("aria-expanded","false");
+        }
+      });
+    }
+  }
+
   setupLiquidNavigation();
   checkAdminAccess();
   renderPage();
 }
-
 
 function updateLiquidLens(){
   const nav=document.getElementById("bottomNav"), lens=document.getElementById("liquidLens");
