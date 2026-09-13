@@ -367,3 +367,72 @@ form{display:grid;gap:14px}.input-grid{display:grid;grid-template-columns:1fr 1f
   border: none !important;
   box-shadow: none !important;
 }
+/* =========================
+   ADMIN PROFILE RESPONSIVE FIX
+   ========================= */
+
+.admin-profile-card {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 24px !important;
+  overflow: hidden !important;
+}
+
+.admin-nameplate-wrap {
+  width: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+}
+
+.admin-nameplate {
+  display: block !important;
+  width: min(720px, 90%) !important;
+  max-width: 720px !important;
+  height: auto !important;
+  max-height: 260px !important;
+  object-fit: contain !important;
+  object-position: center !important;
+}
+
+.admin-nameplate-wrap h3,
+.admin-nameplate-wrap p {
+  align-self: flex-start !important;
+  margin-left: 3% !important;
+}
+
+#openAdminPanel {
+  width: min(494px, 80%) !important;
+  max-width: 494px !important;
+  margin: 0 auto !important;
+  position: relative !important;
+  z-index: 2 !important;
+}
+
+/* Mobile */
+@media (max-width: 600px) {
+
+  .admin-profile-card {
+    padding: 24px 16px !important;
+    gap: 18px !important;
+  }
+
+  .admin-nameplate {
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: 180px !important;
+  }
+
+  .admin-nameplate-wrap h3,
+  .admin-nameplate-wrap p {
+    margin-left: 4px !important;
+  }
+
+  #openAdminPanel {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+}
