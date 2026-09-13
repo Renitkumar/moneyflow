@@ -316,3 +316,54 @@ form{display:grid;gap:14px}.input-grid{display:grid;grid-template-columns:1fr 1f
     font-size: 16px;
   }
 }
+/* ===== FINAL TOPBAR ADJUSTMENTS ===== */
+
+/* MoneyFlow title slightly smaller */
+.topbar .brand b {
+  font-size: 22px !important;
+}
+
+/* ₹ logo box slightly wider */
+.topbar .brand > span {
+  width: 76px !important;
+  min-width: 76px !important;
+  height: 68px !important;
+  flex: 0 0 76px !important;
+}
+
+/* User section shifted ~10% toward right */
+.topbar .header-actions {
+  margin-left: auto !important;
+  margin-right: 2% !important;
+  transform: translateX(10%) !important;
+}
+
+/* Remove circle/background around user initial */
+.topbar .user-chip-avatar {
+  width: auto !important;
+  height: auto !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+}
+
+/* Keep user initial clean */
+.topbar .user-chip-avatar {
+  font-size: 20px !important;
+  font-weight: 700 !important;
+}
+
+/* Compact user button */
+.topbar .user-chip {
+  min-width: 55px !important;
+  width: auto !important;
+  padding: 8px 4px !important;
+  gap: 5px !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
