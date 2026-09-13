@@ -510,12 +510,12 @@ async function adminApi(action, payload={}){
 
 async function checkAdminAccess(){
   try{
-    const data=await adminApi("me");
-    const btn=document.getElementById("adminPanelBtn");
-    if(btn && data.isAdmin)btn.classList.remove("hidden");
-  }catch(_){}
+    const data = await adminApi("me");
+    isAdminUser = !!data.isAdmin;
+  }catch(_){
+    isAdminUser = false;
+  }
 }
-
 async function renderAdmin(p){
   p.innerHTML=`<div class="admin-shell">
     <div class="admin-head">
