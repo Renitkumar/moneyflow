@@ -964,6 +964,7 @@ function renderPage(){
   document.querySelectorAll("[data-page]").forEach(b=>b.classList.toggle("active",b.dataset.page===currentPage));
   requestAnimationFrame(updateLiquidLens);
   if(currentPage==="home")renderHome(p);
+  if(currentPage==="admin-profile")renderAdminProfile(p);
   if(currentPage==="profile")renderProfile(p);
   if(currentPage==="history")renderHistory(p);
   if(currentPage==="add")renderAdd(p);
