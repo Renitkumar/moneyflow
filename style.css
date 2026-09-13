@@ -619,3 +619,36 @@ body {
   }
 
 }
+
+/* =========================
+   IPHONE STANDALONE BACKGROUND
+   EXTEND INTO SAFE AREA
+   ========================= */
+
+html,
+body {
+  background: #1f2024 !important;
+}
+
+/* Full background layer */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -999;
+  pointer-events: none;
+
+  background:
+    radial-gradient(
+      circle at 20% 10%,
+      rgba(255, 255, 255, 0.08),
+      transparent 35%
+    ),
+    #1f2024;
+}
+
+/* Keep app content above background */
+.app-shell {
+  position: relative;
+  z-index: 1;
+}
