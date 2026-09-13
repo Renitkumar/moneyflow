@@ -9,7 +9,6 @@
     "@capacitor/android": "^8.5.2",
     "@capacitor/cli": "^8.5.2",
     "@capacitor/core": "^8.5.2",
-    "@capacitor/ios": "^8.5.2",
     "@capacitor/splash-screen": "^8.0.2",
     "firebase-admin": "^13.5.0"
   }

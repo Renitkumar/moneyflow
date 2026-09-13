@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
-import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updateProfile, getIdToken, GoogleAuthProvider, signInWithPopup, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updateProfile, getIdToken, GoogleAuthProvider, signInWithPopup, sendPasswordResetEmail, verifyPasswordResetCode } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
 import { getFirestore, doc, setDoc, collection, addDoc, query, orderBy, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
 import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-storage.js";
 import { firebaseConfig } from "./firebase-config.js";
@@ -10,6 +10,7 @@ const db = getFirestore(app);
 const storage = getStorage(app);
 const root = document.getElementById("app");
 let currentUser = null, transactions = [], unsubscribe = null, currentPage = "home", dailyTimer = null, profileSaving = false;
+const isAndroidApp = () => !!window.MoneyFlowAndroid || (window.Capacitor?.getPlatform?.() === "android") || (location.protocol === "http:" && location.hostname === "localhost" && /Android/i.test(navigator.userAgent));
 
 const money = n => `₹${Number(n || 0).toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2})}`;
 const esc = s => String(s ?? "").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
@@ -159,13 +160,101 @@ function scheduleDailyRefresh(){
   dailyTimer=setTimeout(()=>{ renderPage(); scheduleDailyRefresh(); }, Math.max(1000,next-now));
 }
 
+async function hashWalletPasscode(passcode){
+  const data=new TextEncoder().encode(String(passcode));
+  const hash=await crypto.subtle.digest("SHA-256",data);
+  return Array.from(new Uint8Array(hash)).map(b=>b.toString(16).padStart(2,"0")).join("");
+}
+function walletPasscodeKey(){ return `moneyflow_wallet_passcode_${currentUser?.uid||"guest"}`; }
+function hasWalletPasscode(){ return !!localStorage.getItem(walletPasscodeKey()) || !!localStorage.getItem(`moneyflow_wallet_passcode_email_${currentUser?.email||""}`); }
+
+function openWalletGate(){
+  if(!isAndroidApp() || !currentUser)return;
+  const old=document.getElementById("walletPasscodeModal"); if(old)old.remove();
+  const has=hasWalletPasscode();
+  const modal=document.createElement("div");
+  modal.id="walletPasscodeModal";
+  modal.className="wallet-modal-overlay";
+  modal.innerHTML=`<section class="wallet-modal glass" role="dialog" aria-modal="true">
+    <div class="wallet-modal-icon">🔐</div>
+    <h3>${has?"Enter Wallet Passcode":"Set Wallet Passcode"}</h3>
+    <p>${has?"Enter your passcode to open MoneyFlow Money.":"Create a 4–6 digit passcode. You will need it whenever you open the Money section."}</p>
+    ${has?`<input id="walletGatePasscode" inputmode="numeric" maxlength="6" type="password" placeholder="Enter 4–6 digit passcode">`:`<input id="walletGatePasscode" inputmode="numeric" maxlength="6" type="password" placeholder="New 4–6 digit passcode"><input id="walletGatePasscodeConfirm" inputmode="numeric" maxlength="6" type="password" placeholder="Confirm passcode">`}
+    <div class="wallet-modal-actions"><button class="secondary" id="walletGateCancel">Cancel</button><button class="primary" id="walletGateSubmit">${has?"Unlock":"Set Passcode"}</button></div>
+    ${has?`<button class="link-btn wallet-forgot-link" id="walletGateForgot">Forgot passcode?</button>`:`<small class="wallet-security-note">Keep this passcode private. It is separate from your MoneyFlow login password.</small>`}
+  </section>`;
+  document.body.appendChild(modal);
+  const close=()=>modal.remove();
+  document.getElementById("walletGateCancel").onclick=close;
+  document.getElementById("walletGateSubmit").onclick=async()=>{
+    const a=document.getElementById("walletGatePasscode")?.value.trim()||"";
+    if(!/^\d{4,6}$/.test(a))return toast("Passcode must be 4–6 digits","error");
+    if(!has){
+      const b=document.getElementById("walletGatePasscodeConfirm")?.value.trim()||"";
+      if(a!==b)return toast("Passcodes do not match","error");
+      localStorage.setItem(walletPasscodeKey(),await hashWalletPasscode(a));
+      close(); currentPage="money"; renderPage(); toast("Wallet passcode set successfully","success");
+    }else{
+      const saved=localStorage.getItem(walletPasscodeKey())||localStorage.getItem(`moneyflow_wallet_passcode_email_${currentUser?.email||""}`);
+      const entered=await hashWalletPasscode(a);
+      if(saved!==entered)return toast("Incorrect wallet passcode","error");
+      close(); currentPage="money"; renderPage();
+    }
+  };
+  document.getElementById("walletGateForgot")?.addEventListener("click",()=>{close();sendWalletPasscodeReset()});
+  modal.onclick=e=>{if(e.target===modal)close()};
+  setTimeout(()=>document.getElementById("walletGatePasscode")?.focus(),0);
+}
+
+async function sendWalletPasscodeReset(){
+  if(!currentUser?.email)return toast("No email is available for this account","error");
+  try{
+    const actionCodeSettings={url:"https://moneyflow-rouge.vercel.app/?walletPasscodeReset=1",handleCodeInApp:false};
+    await sendPasswordResetEmail(auth,currentUser.email,actionCodeSettings);
+    toast("Reset link sent to your registered email","success");
+  }catch(err){toast(err.message.replace("Firebase: ",""),"error")}
+}
+
+async function walletPasscodeResetView(oobCode){
+  try{ await verifyPasswordResetCode(auth,oobCode); }
+  catch(_){ root.innerHTML=`<main class="auth-shell"><section class="auth-card glass"><div class="brand-mark">₹</div><h1>Link expired</h1><p>This wallet passcode reset link is invalid or expired.</p><button class="primary wide" id="resetBackHome">Go to MoneyFlow</button></section></main>`; document.getElementById("resetBackHome").onclick=()=>window.location.href="https://moneyflow-rouge.vercel.app/"; return; }
+  root.innerHTML=`<main class="auth-shell"><div class="orb orb1"></div><div class="orb orb2"></div><section class="auth-card glass"><div class="brand-mark">₹</div><h1>Reset Wallet Passcode</h1><p>Set a new 4–6 digit wallet passcode for your MoneyFlow account.</p><form id="walletResetForm"><input id="walletResetEmail" type="email" disabled><input id="walletResetPasscode" inputmode="numeric" maxlength="6" type="password" placeholder="New 4–6 digit passcode" required><input id="walletResetConfirm" inputmode="numeric" maxlength="6" type="password" placeholder="Confirm passcode" required><button class="primary wide">Set New Passcode</button></form></section></main>`;
+  let email="";
+  try{email=await verifyPasswordResetCode(auth,oobCode);document.getElementById("walletResetEmail").value=email||"";}catch(_){return;}
+  document.getElementById("walletResetForm").onsubmit=async e=>{
+    e.preventDefault();
+    const a=document.getElementById("walletResetPasscode").value.trim(),b=document.getElementById("walletResetConfirm").value.trim();
+    if(!/^\d{4,6}$/.test(a))return toast("Passcode must be 4–6 digits","error");
+    if(a!==b)return toast("Passcodes do not match","error");
+    // Client-side protected prototype storage. Production wallet authentication should move to a server-side wallet service.
+    const key=`moneyflow_wallet_passcode_email_${email}`;
+    localStorage.setItem(key,await hashWalletPasscode(a));
+    toast("Wallet passcode updated","success");
+    setTimeout(()=>{window.location.href="https://moneyflow-rouge.vercel.app/"},700);
+  };
+}
+
+function handleWalletResetLink(){
+  const params=new URLSearchParams(location.search);
+  if(params.get("walletPasscodeReset")!=="1")return false;
+  const code=params.get("oobCode");
+  if(!code){authView("login");return true;}
+  walletPasscodeResetView(code); return true;
+}
+
 function shell(){
+  const android=isAndroidApp();
   root.innerHTML=`<div class="app-shell">
     <header class="topbar glass">
       <div class="brand"><span>₹</span><div><b>MoneyFlow</b><small>Track Today, Build Tomorrow</small></div></div>
       <div class="header-actions">
         <button id="adminPanelBtn" class="admin-panel-btn hidden">⚙ Admin Panel</button>
-        <div class="user-chip">${currentUser?.photoURL?`<img src="${esc(currentUser.photoURL)}" alt="">`:`<span class="user-chip-avatar">${esc((currentUser?.displayName||currentUser?.email||"U").slice(0,1).toUpperCase())}</span>`}<span>${esc(currentUser?.displayName||currentUser?.email||"User")}</span></div>
+        <button id="userChip" class="user-chip" type="button" aria-haspopup="true" aria-expanded="false">${currentUser?.photoURL?`<img src="${esc(currentUser.photoURL)}" alt="">`:`<span class="user-chip-avatar">${esc((currentUser?.displayName||currentUser?.email||"U").slice(0,1).toUpperCase())}</span>`}<span>${esc(currentUser?.displayName||currentUser?.email||"User")}</span><span class="user-chip-chevron">⌄</span></button>
+        ${android?`<div class="profile-menu hidden" id="profileMenu">
+          <button type="button" id="changeWalletPasscode">🔐 <span>Change Wallet Passcode</span></button>
+          <button type="button" id="forgotWalletPasscode">✉ <span>Forgot Passcode</span></button>
+          <button type="button" id="profileLogout">↪ <span>Log out</span></button>
+        </div>`:""}
       </div>
     </header>
     <main class="content"><section id="page"></section></main>
@@ -175,21 +264,34 @@ function shell(){
       <button data-page="history"><i>◷</i><span>History</span></button>
       <button data-page="add" class="add-nav"><i>＋</i><span>Add</span></button>
       <button data-page="download"><i>↓</i><span>Download</span></button>
-      <button id="logout"><i>↪</i><span>Log out</span></button>
+      ${android?`<button data-page="money"><i>₹</i><span>Money</span></button>`:`<button id="logout"><i>↪</i><span>Log out</span></button>`}
     </nav>
   </div>`;
-  document.querySelectorAll("[data-page]").forEach(b=>b.onclick=()=>{currentPage=b.dataset.page;renderPage()});
-  document.getElementById("logout").onclick=async e=>{
-    e.preventDefault();
-    e.stopPropagation();
+
+  document.querySelectorAll("[data-page]").forEach(b=>b.onclick=()=>{const page=b.dataset.page;if(page==="money"&&isAndroidApp()){openWalletGate();return;}currentPage=page;renderPage()});
+
+  const logout=async()=>{
     const confirmed=await confirmLogout();
     if(!confirmed)return;
-    try{
-      await signOut(auth);
-    }catch(err){
-      toast(err.message.replace("Firebase: ",""),"error");
-    }
+    try{ await signOut(auth); }catch(err){ toast(err.message.replace("Firebase: ",""),"error"); }
   };
+
+  const logoutButton=document.getElementById("logout");
+  if(logoutButton)logoutButton.onclick=async e=>{e.preventDefault();e.stopPropagation();await logout()};
+
+  if(android){
+    const chip=document.getElementById("userChip"), menu=document.getElementById("profileMenu");
+    chip.onclick=e=>{
+      e.stopPropagation();
+      const open=menu.classList.toggle("hidden");
+      chip.setAttribute("aria-expanded",String(!open));
+    };
+    document.getElementById("changeWalletPasscode")?.addEventListener("click",()=>openWalletPasscode());
+    document.getElementById("forgotWalletPasscode")?.addEventListener("click",()=>sendWalletPasscodeReset());
+    document.getElementById("profileLogout")?.addEventListener("click",logout);
+    document.addEventListener("click",e=>{if(menu && !menu.contains(e.target) && e.target!==chip){menu.classList.add("hidden");chip.setAttribute("aria-expanded","false")}});
+  }
+
   document.getElementById("adminPanelBtn").onclick=()=>{ currentPage="admin"; renderPage(); };
   setupLiquidNavigation();
   checkAdminAccess();
@@ -212,7 +314,7 @@ function updateLiquidLens(){
 function setupLiquidNavigation(){
   const nav=document.getElementById("bottomNav"), lens=document.getElementById("liquidLens");
   if(!nav || !lens)return;
-  const pages=["home","history","add","download"];
+  const pages=isAndroidApp()?["home","history","add","download","money"]:["home","history","add","download"];
   let dragging=false,moved=false,startX=0,startY=0,startIndex=0,pointerId=null,tapHandled=false;
   const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
   const buttons=()=>pages.map(p=>nav.querySelector(`[data-page="${p}"]`)).filter(Boolean);
@@ -242,7 +344,7 @@ function setupLiquidNavigation(){
     return best;
   }
 
-  function snapTo(index){currentPage=pages[clamp(index,0,pages.length-1)];renderPage();}
+  function snapTo(index){const target=pages[clamp(index,0,pages.length-1)];if(target==="money"&&isAndroidApp()){openWalletGate();return;}currentPage=target;renderPage();}
 
   nav.querySelectorAll("[data-page]").forEach(b=>b.addEventListener("click",e=>{
     if(tapHandled){tapHandled=false;return;}
@@ -599,8 +701,124 @@ async function renderFeedbacks(p){
   }catch(e){document.getElementById("feedbackList").innerHTML=`<div class="admin-error">${esc(e.message)}</div>`}
 }
 
+
+function openWalletPasscode(){
+  const old=document.getElementById("walletPasscodeModal"); if(old)old.remove();
+  const modal=document.createElement("div");
+  modal.id="walletPasscodeModal";
+  modal.className="wallet-modal-overlay";
+  modal.innerHTML=`<section class="wallet-modal glass" role="dialog" aria-modal="true">
+    <div class="wallet-modal-icon">🔐</div>
+    <h3>Change Wallet Passcode</h3>
+    <p>Set a new 4–6 digit passcode for your wallet.</p>
+    <input id="walletPasscodeNew" inputmode="numeric" maxlength="6" type="password" placeholder="New 4–6 digit passcode">
+    <input id="walletPasscodeConfirm" inputmode="numeric" maxlength="6" type="password" placeholder="Confirm passcode">
+    <div class="wallet-modal-actions"><button class="secondary" id="walletPasscodeCancel">Cancel</button><button class="primary" id="walletPasscodeSave">Save</button></div>
+    <small class="wallet-security-note">Your wallet passcode is separate from your MoneyFlow login password.</small>
+  </section>`;
+  document.body.appendChild(modal);
+  const close=()=>modal.remove();
+  document.getElementById("walletPasscodeCancel").onclick=close;
+  document.getElementById("walletPasscodeSave").onclick=async()=>{
+    const a=document.getElementById("walletPasscodeNew").value.trim(), b=document.getElementById("walletPasscodeConfirm").value.trim();
+    if(!/^\d{4,6}$/.test(a))return toast("Passcode must be 4–6 digits","error");
+    if(a!==b)return toast("Passcodes do not match","error");
+    localStorage.setItem(walletPasscodeKey(),await hashWalletPasscode(a));
+    close(); toast("Wallet passcode updated","success");
+  };
+  modal.onclick=e=>{if(e.target===modal)close()};
+  setTimeout(()=>document.getElementById("walletPasscodeNew")?.focus(),0);
+}
+
+function moneyWalletBalance(){
+  // Design-stage wallet balance. Real balance will come from verified payment/payout ledger.
+  return Number(localStorage.getItem(`moneyflow_wallet_balance_${currentUser?.uid||"guest"}`)||0);
+}
+
+function renderMoney(p){
+  const name=currentUser?.displayName||currentUser?.email?.split("@")[0]||"User";
+  p.innerHTML=`<section class="money-page">
+    <div class="money-hero">
+      <div><div class="eyebrow">MONEYFLOW MONEY</div><h2>Money</h2><p>Receive, hold and withdraw money from your MoneyFlow wallet.</p></div>
+      <div class="money-hero-icon">₹</div>
+    </div>
+    <section class="money-actions-grid">
+      <button class="money-action glass" id="myQrAction"><span class="money-action-icon qr">⌗</span><b>QR Code</b><small>Receive money</small><span class="money-arrow">›</span></button>
+      <button class="money-action glass" id="walletAction"><span class="money-action-icon wallet">₹</span><b>Wallet</b><small>View balance & history</small><span class="money-arrow">›</span></button>
+      <button class="money-action glass" id="withdrawAction"><span class="money-action-icon withdraw">↗</span><b>Withdraw</b><small>Send to bank account</small><span class="money-arrow">›</span></button>
+    </section>
+    <section class="money-security glass"><div class="money-security-icon">🔐</div><div><b>Wallet protected</b><p>Payment and withdrawal actions will require wallet authentication.</p></div></section>
+    <p class="money-note">UPI receiving and bank withdrawal are connected in the next payment-gateway integration step. No fake balance is added by the UI.</p>
+  </section>`;
+
+  document.getElementById("myQrAction").onclick=()=>renderWalletQr();
+  document.getElementById("walletAction").onclick=()=>renderWalletDetails();
+  document.getElementById("withdrawAction").onclick=()=>renderWalletWithdraw();
+}
+
+function renderWalletDetails(){
+  const p=document.getElementById("page");
+  const balance=moneyWalletBalance();
+  p.innerHTML=`<section class="wallet-subpage">
+    <button class="download-back" id="moneyBack">←</button>
+    <div class="wallet-sub-head"><div><div class="eyebrow">MONEYFLOW WALLET</div><h2>My Wallet</h2><p class="muted">Your wallet balance and money actions.</p></div><div class="wallet-mini-icon">₹</div></div>
+    <section class="wallet-detail-card glass">
+      <div class="eyebrow">AVAILABLE BALANCE</div>
+      <div class="wallet-detail-balance">${money(balance)}</div>
+      <div class="wallet-detail-actions">
+        <button class="primary" id="scanPay">⌗ Scan & Pay</button>
+        <button class="secondary" id="walletHistory">◷ History</button>
+      </div>
+      <div class="wallet-history-list"><div class="wallet-history-empty">No wallet transactions yet. Verified QR payments will appear here as positive or negative entries.</div></div>
+    </section>
+    <p class="money-note">Positive = money received · Negative = money paid or withdrawn.</p>
+  </section>`;
+  document.getElementById("moneyBack").onclick=()=>{currentPage="money";renderPage()};
+  document.getElementById("scanPay").onclick=()=>toast("QR scanner will be connected to the payment gateway","info");
+  document.getElementById("walletHistory").onclick=()=>toast("Wallet transaction history will appear after verified payments","info");
+}
+
+function renderWalletQr(){
+  const p=document.getElementById("page");
+  const name=currentUser?.displayName||currentUser?.email?.split("@")[0]||"User";
+  const id=(currentUser?.uid||"user").slice(0,12).toUpperCase();
+  p.innerHTML=`<section class="wallet-subpage">
+    <button class="download-back" id="moneyBack">←</button>
+    <div class="wallet-sub-head"><div><div class="eyebrow">RECEIVE MONEY</div><h2>My QR Code</h2><p class="muted">Scan this QR from a supported UPI app to pay you.</p></div><div class="wallet-mini-icon">⌗</div></div>
+    <section class="my-qr-card glass">
+      <div class="qr-frame"><div class="fake-qr" aria-label="QR code preview">${Array.from({length:81},(_,i)=>`<i class="q${(i*17+3)%7}"></i>`).join("")}</div></div>
+      <h3>${esc(name)}</h3><p>MoneyFlow Wallet</p><small>Wallet ID · ${esc(id)}</small>
+      <button class="primary wide" id="shareQr">↗ Share QR</button>
+    </section>
+    <section class="wallet-info glass"><b>How receiving works</b><p>Customer scans your QR → payment is verified → the confirmed amount is credited to your wallet.</p></section>
+  </section>`;
+  document.getElementById("moneyBack").onclick=()=>{currentPage="money";renderPage()};
+  document.getElementById("shareQr").onclick=()=>toast("QR sharing will be connected with the payment gateway","info");
+}
+
+function renderWalletWithdraw(){
+  const p=document.getElementById("page");
+  p.innerHTML=`<section class="wallet-subpage">
+    <button class="download-back" id="moneyBack">←</button>
+    <div class="wallet-sub-head"><div><div class="eyebrow">WALLET</div><h2>Withdraw</h2><p class="muted">Transfer available wallet funds to your bank account.</p></div><div class="wallet-mini-icon">↗</div></div>
+    <section class="withdraw-card glass">
+      <div class="withdraw-balance"><span>Available</span><strong>${money(moneyWalletBalance())}</strong></div>
+      <label>Account holder name<input id="bankName" placeholder="Full name"></label>
+      <label>Bank account number<input id="bankAccount" inputmode="numeric" placeholder="Account number"></label>
+      <label>IFSC code<input id="bankIfsc" autocapitalize="characters" placeholder="ABCD0123456"></label>
+      <label>Amount<input id="withdrawAmount" type="number" min="1" step="0.01" placeholder="500"></label>
+      <button class="primary wide" id="withdrawSubmit">Withdraw money</button>
+      <small class="withdraw-note">Bank payout will be processed only after the payment/payout provider is connected and the withdrawal is verified.</small>
+    </section>
+  </section>`;
+  document.getElementById("moneyBack").onclick=()=>{currentPage="money";renderPage()};
+  document.getElementById("withdrawSubmit").onclick=()=>toast("Withdrawal integration is ready for the payout gateway setup","info");
+}
+
 function renderPage(){
   const p=document.getElementById("page"); if(!p)return;
+  const topbar=document.querySelector(".topbar");
+  if(topbar)topbar.classList.toggle("page-header-hidden",currentPage!=="home");
   document.querySelectorAll("[data-page]").forEach(b=>b.classList.toggle("active",b.dataset.page===currentPage));
   requestAnimationFrame(updateLiquidLens);
   if(currentPage==="home")renderHome(p);
@@ -608,6 +826,7 @@ function renderPage(){
   if(currentPage==="history")renderHistory(p);
   if(currentPage==="add")renderAdd(p);
   if(currentPage==="download")renderDownload(p);
+  if(currentPage==="money" && isAndroidApp())renderMoney(p);
   if(currentPage==="admin")renderAdmin(p);
   if(currentPage==="feedback")renderFeedbacks(p);
 }
@@ -633,12 +852,12 @@ function renderHome(p){
       <strong>${money(debit)}</strong><small>Today's debits</small>
     </article>
   </section>
-  <article class="balance-card ${balance<0?"down":""}">
+  ${isAndroidApp()?"":`<article class="balance-card ${balance<0?"down":""}">
     <div class="balance-icon">▣</div><div>
       <div class="label">CURRENT BALANCE</div><strong>${money(balance)}</strong>
       <small>${balance>=0?"Today's remaining balance":"Watch today's spending"}</small>
     </div><div class="balance-arrow">${balance>=0?"↑":"↓"}</div>
-  </article>
+  </article>`}
     <div class="quote">𓆩♛𓆪<br><b>MANIYA,<br></b></div>`;
 }
 
@@ -874,7 +1093,10 @@ function downloadCsvReport(fromDate,toDate,rows,label){
 }
 function range(f,t){return transactions.filter(x=>x.date>=f&&x.date<=t).sort((a,b)=>b.date.localeCompare(a.date))}
 
+if(!handleWalletResetLink()){}
+
 onAuthStateChanged(auth,user=>{
+  if(new URLSearchParams(location.search).get("walletPasscodeReset")==="1")return;
   currentUser=user;
   if(!user){if(unsubscribe)unsubscribe();if(dailyTimer)clearTimeout(dailyTimer);dailyTimer=null;authView();return}
   currentPage="home"; shell();
