@@ -226,3 +226,93 @@ form{display:grid;gap:14px}.input-grid{display:grid;grid-template-columns:1fr 1f
 
 /* Android Home-only top bar: match the approved MoneyFlow reference */
 @media(max-width:620px){.topbar{height:122px;border-radius:0 0 42px 42px;padding:0 34px}.brand{gap:15px}.brand>span{width:68px;height:68px;border-radius:22px;font-size:29px}.brand b{font-size:27px}.brand small{font-size:12px}.user-chip{min-width:205px;max-width:205px;min-height:74px;padding:9px 12px 9px 10px;font-size:19px}.user-chip-avatar,.user-chip img{width:48px;height:48px;flex-basis:48px}.user-chip-chevron{font-size:16px}.topbar .header-actions{position:relative}}
+/* ===== MONEYFLOW TOPBAR FIX ===== */
+@media (max-width: 620px) {
+
+  .topbar {
+    height: 122px;
+    padding: 0 34px;
+    border-radius: 0 0 42px 42px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+  }
+
+  .topbar .brand {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    flex: 0 1 auto;
+    min-width: 0;
+  }
+
+  .topbar .brand > span {
+    width: 68px !important;
+    height: 68px !important;
+    min-width: 68px !important;
+    min-height: 68px !important;
+    flex: 0 0 68px !important;
+    border-radius: 20px !important;
+    display: grid !important;
+    place-items: center !important;
+    font-size: 30px !important;
+    line-height: 1 !important;
+  }
+
+  .topbar .brand > div {
+    min-width: 0;
+  }
+
+  .topbar .brand b {
+    font-size: 26px;
+    white-space: nowrap;
+  }
+
+  .topbar .brand small {
+    font-size: 13px;
+    white-space: nowrap;
+  }
+
+  .topbar .header-actions {
+    flex: 0 0 auto;
+    min-width: 0;
+  }
+
+  .topbar .user-chip {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 14px 8px 8px;
+    border-radius: 999px;
+    max-width: 205px;
+    min-width: 0;
+    flex: 0 1 auto;
+    font-size: 18px;
+  }
+
+  .topbar .user-chip-avatar,
+  .topbar .user-chip img {
+    width: 48px !important;
+    height: 48px !important;
+    min-width: 48px !important;
+    min-height: 48px !important;
+    flex: 0 0 48px !important;
+    border-radius: 50% !important;
+    object-fit: cover;
+    display: grid;
+    place-items: center;
+  }
+
+  .topbar .user-chip > span:not(.user-chip-avatar):not(.user-chip-chevron) {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .topbar .user-chip-chevron {
+    flex: 0 0 auto;
+    font-size: 16px;
+  }
+}
