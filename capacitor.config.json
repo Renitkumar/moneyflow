@@ -1,0 +1,14 @@
+{
+  "appId": "com.moneyflow.app",
+  "appName": "MoneyFlow",
+  "webDir": "www",
+  "plugins": {
+    "SplashScreen": {
+      "launchAutoHide": true,
+      "launchShowDuration": 0,
+      "launchFadeOutDuration": 0,
+      "backgroundColor": "#A5AEB8",
+      "showSpinner": false
+    }
+  }
+}
