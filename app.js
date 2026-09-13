@@ -365,15 +365,34 @@ function shell(){
         );
       };
 
+    if(android){
+    const chip=document.getElementById("userChip");
+    const menu=document.getElementById("profileMenu");
+
+    if(chip && menu){
+
+      chip.onclick=e=>{
+        e.stopPropagation();
+
+        const open=menu.classList.toggle("hidden");
+
+        chip.setAttribute(
+          "aria-expanded",
+          String(!open)
+        );
+      };
+
       document.getElementById("changeWalletPasscode")
         ?.addEventListener("click",()=>{
           menu.classList.add("hidden");
+          chip.setAttribute("aria-expanded","false");
           openWalletPasscode();
         });
 
       document.getElementById("forgotWalletPasscode")
         ?.addEventListener("click",()=>{
           menu.classList.add("hidden");
+          chip.setAttribute("aria-expanded","false");
           sendWalletPasscodeReset();
         });
 
@@ -390,6 +409,23 @@ function shell(){
           chip.setAttribute("aria-expanded","false");
         }
       });
+    }
+  }
+
+  // WEBSITE ADMIN PROFILE
+  if(!android){
+    const chip=document.getElementById("userChip");
+
+    if(chip){
+      chip.onclick=e=>{
+        e.preventDefault();
+        e.stopPropagation();
+
+        if(isAdminUser){
+          currentPage="admin-profile";
+          renderPage();
+        }
+      };
     }
   }
 
