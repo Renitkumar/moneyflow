@@ -10,6 +10,7 @@ const db = getFirestore(app);
 const storage = getStorage(app);
 const root = document.getElementById("app");
 let currentUser = null, transactions = [], unsubscribe = null, currentPage = "home", dailyTimer = null, profileSaving = false;
+let isAdminUser = false;
 const isAndroidApp = () => !!window.MoneyFlowAndroid || (window.Capacitor?.getPlatform?.() === "android") || (location.protocol === "http:" && location.hostname === "localhost" && /Android/i.test(navigator.userAgent));
 
 const money = n => `₹${Number(n || 0).toLocaleString("en-IN",{minimumFractionDigits:2,maximumFractionDigits:2})}`;
