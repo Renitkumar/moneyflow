@@ -542,42 +542,49 @@ form{display:grid;gap:14px}.input-grid{display:grid;grid-template-columns:1fr 1f
 }
 
 
-/* =========================
-   MOBILE TOPBAR RUPEE FIX
-   ========================= */
+/* MOBILE TOPBAR - FINAL RUPEE FIX */
 
 @media (max-width: 600px) {
-
-  .topbar .brand {
-    min-width: 0 !important;
-    width: auto !important;
-    flex: 1 !important;
-    overflow: hidden !important;
-  }
 
   .topbar .brand > span {
     width: 40px !important;
     min-width: 40px !important;
     max-width: 40px !important;
-    height: 20px !important;
-    max-height: 25px !important;
-    flex: 0 0 35px !important;
 
-    font-size: 24px !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    max-height: 40px !important;
+
+    flex: 0 0 40px !important;
+
+    padding: 0 !important;
+    margin: 0 !important;
+
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+
     overflow: hidden !important;
     box-sizing: border-box !important;
+
+    border-radius: 12px !important;
+
+    font-size: 24px !important;
+    line-height: 1 !important;
+
+    transform: none !important;
+  }
+
+  .topbar .brand {
+    display: flex !important;
+    align-items: center !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
   }
 
   .topbar .brand > div {
     min-width: 0 !important;
     overflow: hidden !important;
-  }
-
-  .topbar .brand b,
-  .topbar .brand small {
-    white-space: nowrap !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
   }
 
 }
