@@ -247,6 +247,7 @@ function shell(){
   const android=isAndroidApp();
 
   root.innerHTML=`<div class="app-shell">
+
     <header class="topbar glass">
       <div class="brand">
         <span>₹</span>
@@ -257,62 +258,102 @@ function shell(){
       </div>
 
       <div class="header-actions">
-        <button id="userChip" class="user-chip" type="button"
-          aria-haspopup="true" aria-expanded="false">
+        <button id="userChip"
+          class="user-chip"
+          type="button"
+          aria-haspopup="true"
+          aria-expanded="false">
+
           <span class="user-chip-avatar">
-            ${esc((currentUser?.displayName || currentUser?.email || "U")
-              .slice(0,1).toUpperCase())}
+            ${esc(
+              (currentUser?.displayName ||
+               currentUser?.email ||
+               "U")
+              .slice(0,1)
+              .toUpperCase()
+            )}
           </span>
+
           <span class="user-chip-chevron">⌄</span>
         </button>
 
-        ${android ? `<div class="profile-menu hidden" id="profileMenu">
-          <button type="button" id="changeWalletPasscode">
-            🔐 <span>Change Wallet Passcode</span>
-          </button>
-          <button type="button" id="forgotWalletPasscode">
-            ✉ <span>Forgot Passcode</span>
-          </button>
-          <button type="button" id="profileLogout">
-            ↪ <span>Log out</span>
-          </button>
-        </div>` : ""}
+        ${android ? `
+          <div class="profile-menu hidden" id="profileMenu">
+
+            <button type="button" id="changeWalletPasscode">
+              🔐 <span>Change Wallet Passcode</span>
+            </button>
+
+            <button type="button" id="forgotWalletPasscode">
+              ✉ <span>Forgot Passcode</span>
+            </button>
+
+            <button type="button" id="profileLogout">
+              ↪ <span>Log out</span>
+            </button>
+
+          </div>
+        ` : ""}
       </div>
     </header>
+
 
     <main class="content">
       <section id="page"></section>
     </main>
 
+
     <nav class="bottom-nav liquid-nav glass" id="bottomNav">
-      <div class="liquid-lens" id="liquidLens" aria-hidden="true"></div>
+
+      <div
+        class="liquid-lens"
+        id="liquidLens"
+        aria-hidden="true">
+      </div>
 
       <button data-page="home">
-        <i>⌂</i><span>Home</span>
+        <i>⌂</i>
+        <span>Home</span>
       </button>
 
       <button data-page="history">
-        <i>◷</i><span>History</span>
+        <i>◷</i>
+        <span>History</span>
       </button>
 
       <button data-page="add" class="add-nav">
-        <i>＋</i><span>Add</span>
+        <i>＋</i>
+        <span>Add</span>
       </button>
 
       <button data-page="download">
-        <i>↓</i><span>Download</span>
+        <i>↓</i>
+        <span>Download</span>
       </button>
 
       ${android
-        ? `<button data-page="money">
-            <i>₹</i><span>Money</span>
-          </button>`
-        : `<button id="logout">
-            <i>↪</i><span>Log out</span>
-          </button>`
+        ? `
+          <button data-page="money">
+            <i>₹</i>
+            <span>Money</span>
+          </button>
+        `
+        : `
+          <button id="logout">
+            <i>↪</i>
+            <span>Log out</span>
+          </button>
+        `
       }
+
     </nav>
+
   </div>`;
+
+
+  /* =========================
+     BOTTOM NAVIGATION
+     ========================= */
 
   document.querySelectorAll("[data-page]").forEach(b=>{
     b.onclick=()=>{
@@ -328,16 +369,26 @@ function shell(){
     };
   });
 
+
+  /* =========================
+     LOGOUT
+     ========================= */
+
   const logout=async()=>{
     const confirmed=await confirmLogout();
+
     if(!confirmed)return;
 
     try{
       await signOut(auth);
     }catch(err){
-      toast(err.message.replace("Firebase: ",""),"error");
+      toast(
+        err.message.replace("Firebase: ",""),
+        "error"
+      );
     }
   };
+
 
   const logoutButton=document.getElementById("logout");
 
@@ -349,23 +400,13 @@ function shell(){
     };
   }
 
+
+  /* =========================
+     ANDROID PROFILE MENU
+     ========================= */
+
   if(android){
-    const chip=document.getElementById("userChip");
-    const menu=document.getElementById("profileMenu");
 
-    if(chip && menu){
-      chip.onclick=e=>{
-        e.stopPropagation();
-
-        const open=menu.classList.toggle("hidden");
-
-        chip.setAttribute(
-          "aria-expanded",
-          String(!open)
-        );
-      };
-
-    if(android){
     const chip=document.getElementById("userChip");
     const menu=document.getElementById("profileMenu");
 
@@ -381,23 +422,35 @@ function shell(){
           String(!open)
         );
       };
+
 
       document.getElementById("changeWalletPasscode")
         ?.addEventListener("click",()=>{
           menu.classList.add("hidden");
-          chip.setAttribute("aria-expanded","false");
+          chip.setAttribute(
+            "aria-expanded",
+            "false"
+          );
+
           openWalletPasscode();
         });
+
 
       document.getElementById("forgotWalletPasscode")
         ?.addEventListener("click",()=>{
           menu.classList.add("hidden");
-          chip.setAttribute("aria-expanded","false");
+          chip.setAttribute(
+            "aria-expanded",
+            "false"
+          );
+
           sendWalletPasscodeReset();
         });
 
+
       document.getElementById("profileLogout")
         ?.addEventListener("click",logout);
+
 
       document.addEventListener("click",e=>{
         if(
@@ -406,34 +459,55 @@ function shell(){
           e.target!==chip
         ){
           menu.classList.add("hidden");
-          chip.setAttribute("aria-expanded","false");
+
+          chip.setAttribute(
+            "aria-expanded",
+            "false"
+          );
         }
       });
+
     }
+
   }
 
-  // WEBSITE ADMIN PROFILE
+
+  /* =========================
+     WEBSITE ADMIN PROFILE
+     ========================= */
+
   if(!android){
+
     const chip=document.getElementById("userChip");
 
     if(chip){
+
       chip.onclick=e=>{
         e.preventDefault();
         e.stopPropagation();
 
         if(isAdminUser){
+
           currentPage="admin-profile";
           renderPage();
+
         }
+
       };
+
     }
+
   }
+
+
+  /* =========================
+     START APP
+     ========================= */
 
   setupLiquidNavigation();
   checkAdminAccess();
   renderPage();
 }
-
 function updateLiquidLens(){
   const nav=document.getElementById("bottomNav"), lens=document.getElementById("liquidLens");
   if(!nav || !lens)return;
