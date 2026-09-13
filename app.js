@@ -733,7 +733,50 @@ async function uploadProfileImage(file){
   }catch(e){toast(e.message.replace("Firebase: ",""),"error")}
   finally{profileSaving=false;}
 }
+function renderAdminProfile(p){
+  p.innerHTML=`<section class="profile-page admin-profile-page">
 
+    <div class="profile-head">
+      <div>
+        <div class="eyebrow">ADMIN ACCOUNT</div>
+        <h2>Admin Profile</h2>
+        <p class="muted">Manage your MoneyFlow administration.</p>
+      </div>
+
+      <button class="secondary" id="adminProfileBack">← Home</button>
+    </div>
+
+    <section class="profile-card glass admin-profile-card">
+
+      <div class="admin-nameplate-wrap">
+        <img
+          src="/admin-nameplate.png"
+          alt="Admin"
+          class="admin-nameplate"
+        />
+
+        <h3>ADMIN</h3>
+        <p class="muted">MoneyFlow Administrator</p>
+      </div>
+
+      <button class="primary wide" id="openAdminPanel">
+        ⚙ ADMIN PANEL
+      </button>
+
+    </section>
+
+  </section>`;
+
+  document.getElementById("adminProfileBack").onclick=()=>{
+    currentPage="home";
+    renderPage();
+  };
+
+  document.getElementById("openAdminPanel").onclick=()=>{
+    currentPage="admin";
+    renderPage();
+  };
+}
 function renderProfile(p){
   const name=currentUser?.displayName||currentUser?.email?.split("@")[0]||"User";
   const photo=currentUser?.photoURL||"";
