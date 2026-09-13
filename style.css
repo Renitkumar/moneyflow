@@ -559,8 +559,8 @@ form{display:grid;gap:14px}.input-grid{display:grid;grid-template-columns:1fr 1f
     width: 40px !important;
     min-width: 40px !important;
     max-width: 40px !important;
-    height: 38px !important;
-    max-height: 38px !important;
+    height: 30px !important;
+    max-height: 31px !important;
     flex: 0 0 40px !important;
 
     font-size: 24px !important;
