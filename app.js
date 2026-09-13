@@ -249,7 +249,12 @@ function shell(){
       <div class="brand"><span>₹</span><div><b>MoneyFlow</b><small>Track Today, Build Tomorrow</small></div></div>
       <div class="header-actions">
         <button id="adminPanelBtn" class="admin-panel-btn hidden">⚙ Admin Panel</button>
-        <button id="userChip" class="user-chip" type="button" aria-haspopup="true" aria-expanded="false">${currentUser?.photoURL?`<img src="${esc(currentUser.photoURL)}" alt="">`:`<span class="user-chip-avatar">${esc((currentUser?.displayName||currentUser?.email||"U").slice(0,1).toUpperCase())}</span>`}<span>${esc(currentUser?.displayName||currentUser?.email||"User")}</span><span class="user-chip-chevron">⌄</span></button>
+       <button id="userChip" class="user-chip" type="button" aria-haspopup="true" aria-expanded="false">
+  <span class="user-chip-avatar">
+    ${esc((currentUser?.displayName || currentUser?.email || "U").slice(0,1).toUpperCase())}
+  </span>
+  <span class="user-chip-chevron">⌄</span>
+</button>
         ${android?`<div class="profile-menu hidden" id="profileMenu">
           <button type="button" id="changeWalletPasscode">🔐 <span>Change Wallet Passcode</span></button>
           <button type="button" id="forgotWalletPasscode">✉ <span>Forgot Passcode</span></button>
