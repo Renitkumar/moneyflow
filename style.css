@@ -436,3 +436,107 @@ form{display:grid;gap:14px}.input-grid{display:grid;grid-template-columns:1fr 1f
   }
 
 }
+/* =========================
+   COMPACT LIQUID GLASS TOPBAR
+   ========================= */
+
+.topbar {
+  min-height: 64px !important;
+  height: 64px !important;
+  padding: 8px 18px !important;
+
+  background: rgba(255, 255, 255, 0.12) !important;
+  backdrop-filter: blur(22px) saturate(150%) !important;
+  -webkit-backdrop-filter: blur(22px) saturate(150%) !important;
+
+  border: 1px solid rgba(255, 255, 255, 0.28) !important;
+  border-radius: 22px !important;
+
+  box-shadow:
+    0 8px 30px rgba(0, 0, 0, 0.12),
+    inset 0 1px 1px rgba(255, 255, 255, 0.25) !important;
+}
+
+/* MoneyFlow logo */
+.topbar .brand > span {
+  width: 48px !important;
+  min-width: 48px !important;
+  height: 44px !important;
+
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+
+  border-radius: 14px !important;
+}
+
+/* MoneyFlow text */
+.topbar .brand b {
+  font-size: 19px !important;
+}
+
+.topbar .brand small {
+  font-size: 10px !important;
+}
+
+/* User initial circle */
+.topbar .user-chip-avatar {
+  width: 34px !important;
+  height: 34px !important;
+  min-width: 34px !important;
+  min-height: 34px !important;
+
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+
+  border-radius: 50% !important;
+  border: 1px solid rgba(255,255,255,.35) !important;
+  background: rgba(255,255,255,.12) !important;
+
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+
+  font-size: 15px !important;
+  font-weight: 700 !important;
+}
+
+/* Right side */
+.topbar .header-actions {
+  margin-left: auto !important;
+}
+
+/* Mobile */
+@media (max-width: 600px) {
+
+  .topbar {
+    min-height: 56px !important;
+    height: 56px !important;
+    padding: 6px 12px !important;
+    border-radius: 18px !important;
+  }
+
+  .topbar .brand > span {
+    width: 40px !important;
+    min-width: 40px !important;
+    height: 38px !important;
+    border-radius: 11px !important;
+  }
+
+  .topbar .brand b {
+    font-size: 16px !important;
+  }
+
+  .topbar .brand small {
+    font-size: 8px !important;
+  }
+
+  .topbar .user-chip-avatar {
+    width: 30px !important;
+    height: 30px !important;
+    min-width: 30px !important;
+    min-height: 30px !important;
+    font-size: 14px !important;
+  }
+
+}
