@@ -680,3 +680,28 @@ body::before {
   }
 
 }
+/* =========================
+   PC ONLY - REMOVE EXTRA FOG
+   KEEP 30% LIVE BACKGROUND
+   ========================= */
+
+@media (min-width: 621px) {
+
+  /* Keep the original blurred/live background visible */
+  .app-shell {
+    background: transparent !important;
+  }
+
+  /* Remove only the extra fog overlay */
+  .app-shell:after {
+    background: transparent !important;
+  }
+
+  /* DO NOT change the background image blur */
+  .app-shell:before {
+    filter: blur(8px) !important;
+    transform: scale(1.025) !important;
+    opacity: .78 !important;
+  }
+
+}
