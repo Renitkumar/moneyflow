@@ -652,3 +652,29 @@ body::before {
   position: relative;
   z-index: 1;
 }
+/* =========================
+   STEP 5 - IPHONE TOP SAFE AREA
+   ========================= */
+
+@supports (padding-top: env(safe-area-inset-top)) {
+
+  html {
+    background: #dfe3e8 !important;
+  }
+
+  body {
+    background: #dfe3e8 !important;
+  }
+
+  .app-shell {
+    min-height: 100vh !important;
+    min-height: 100dvh !important;
+
+    /* background ko status-bar area tak extend rakho */
+    margin-top: calc(env(safe-area-inset-top) * -1) !important;
+    padding-top: env(safe-area-inset-top) !important;
+
+    box-sizing: border-box !important;
+  }
+
+}
