@@ -653,3 +653,21 @@ body::before {
   z-index: 1;
 }
 
+/* =========================
+   DESKTOP CLEAR BACKGROUND
+   REMOVE FOG / BLUR
+   ========================= */
+
+@media (min-width: 621px) {
+
+  .app-shell:before {
+    filter: none !important;
+    transform: none !important;
+    opacity: 1 !important;
+  }
+
+  .app-shell:after {
+    background: transparent !important;
+  }
+
+}
