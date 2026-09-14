@@ -589,36 +589,6 @@ form{display:grid;gap:14px}.input-grid{display:grid;grid-template-columns:1fr 1f
 
 }
 
-/* =========================
-   IPHONE HOME SCREEN APP
-   SAFE AREA BACKGROUND FIX
-   ========================= */
-
-html {
-  background: #1f2024 !important;
-}
-
-body {
-  background: #1f2024 !important;
-  min-height: 100vh !important;
-  min-height: 100dvh !important;
-}
-
-/* iPhone standalone / PWA */
-@supports (-webkit-touch-callout: none) {
-
-  body {
-    padding-top: env(safe-area-inset-top) !important;
-    background: #1f2024 !important;
-  }
-
-  .app-shell {
-    min-height: 100vh !important;
-    min-height: 100dvh !important;
-    background: #1f2024 !important;
-  }
-
-}
 
 /* =========================
    IPHONE STANDALONE BACKGROUND
